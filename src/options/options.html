@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>网页 AI 助手 · 设置</title>
+    <link rel="stylesheet" href="../content/panel.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 24px 16px 48px;
+        background: var(--ap-bg-mute);
+        color: var(--ap-text);
+      }
+      .options__intro {
+        max-width: 720px;
+        margin: 0 auto 16px;
+        font-size: 0.85rem;
+        line-height: 1.7;
+        color: var(--ap-text-soft);
+      }
+      .options__intro h1 {
+        margin: 0 0 0.4rem;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--ap-text);
+      }
+      .options__intro code {
+        padding: 0.05rem 0.3rem;
+        border-radius: 4px;
+        background: var(--ap-bg);
+        font-size: 0.8rem;
+      }
+      #app {
+        max-width: 720px;
+        margin: 0 auto;
+      }
+    </style>
+  </head>
+  <body class="apweb-scope">
+    <div class="options__intro">
+      <h1>网页 AI 助手</h1>
+      <p>
+        这里的设置对整个浏览器生效，和网页内面板里 ⚙ 打开的是同一份。也可以直接在任意网页上
+        点工具栏图标打开面板来配置。请求由浏览器直接发往你填的接口地址，<code>key</code>
+        只存在本机 <code>browser.storage.local</code>，不经过任何中转。
+      </p>
+    </div>
+    <div id="app"></div>
+
+    <script src="../../vendor/marked.umd.js"></script>
+    <script src="../../vendor/purify.min.js"></script>
+    <script src="../shared/ai.js"></script>
+    <script src="../shared/markdown.js"></script>
+    <script src="../shared/store.js"></script>
+    <script src="../content/panel.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

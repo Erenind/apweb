@@ -1,0 +1,819 @@
+/* Styles for the assistant panel. Loaded inside a ShadowRoot on real pages and
+   as a plain stylesheet on the options page, so everything is scoped under
+   `.apweb-scope` instead of relying on `:host` or document-wide resets. */
+
+.apweb-scope {
+  --ap-accent: hsla(160, 100%, 37%, 1);
+  --ap-accent-ink: #04140f;
+  --ap-bg: #ffffff;
+  --ap-bg-soft: #f8f8f8;
+  --ap-bg-mute: #f2f2f2;
+  --ap-border: rgba(60, 60, 60, 0.14);
+  --ap-border-hover: rgba(60, 60, 60, 0.3);
+  --ap-text: #2c3e50;
+  --ap-text-soft: rgba(44, 62, 80, 0.68);
+  --ap-danger: #dc2626;
+  --ap-shadow: 0 10px 40px rgba(0, 0, 0, 0.22);
+
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ap-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  .apweb-scope {
+    --ap-accent-ink: #04140f;
+    --ap-bg: #181818;
+    --ap-bg-soft: #222222;
+    --ap-bg-mute: #282828;
+    --ap-border: rgba(235, 235, 235, 0.16);
+    --ap-border-hover: rgba(235, 235, 235, 0.34);
+    --ap-text: rgba(235, 235, 235, 0.9);
+    --ap-text-soft: rgba(235, 235, 235, 0.6);
+    --ap-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+  }
+}
+
+.apweb-scope *,
+.apweb-scope *::before,
+.apweb-scope *::after {
+  box-sizing: border-box;
+}
+
+/* ------------------------------- the panel -------------------------------- */
+
+.apweb-panel {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 2147483646;
+  display: flex;
+  flex-direction: column;
+  width: min(380px, calc(100vw - 24px));
+  height: min(620px, calc(100vh - 32px));
+  min-width: 280px;
+  min-height: 240px;
+  overflow: hidden;
+  border: 1px solid var(--ap-border);
+  border-radius: 14px;
+  background: var(--ap-bg-soft);
+  color: var(--ap-text);
+  box-shadow: var(--ap-shadow);
+  resize: both;
+}
+
+.apweb-panel[hidden] {
+  display: none;
+}
+
+.apweb-scope--embed .apweb-panel {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: min(720px, calc(100vh - 40px));
+  margin: 0 auto;
+  resize: none;
+}
+
+/* Native browser sidebar: fill the panel Firefox gives us, edge to edge. */
+.apweb-scope--fill .apweb-panel {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 100vh;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  resize: none;
+}
+
+/* ------------------------------ docked layout ------------------------------ */
+
+/* Docked: full height against one edge; the width is an inline style driven by
+   the grip below (CSS `resize` would only offer a bottom-right corner handle). */
+.apweb-scope--dock .apweb-panel {
+  top: 0;
+  bottom: 0;
+  height: 100%;
+  border-radius: 0;
+  box-shadow: none;
+  resize: none;
+}
+
+.apweb-scope--dock-right .apweb-panel {
+  right: 0;
+  left: auto;
+  border-left: 1px solid var(--ap-border);
+}
+
+.apweb-scope--dock-left .apweb-panel {
+  left: 0;
+  right: auto;
+  border-right: 1px solid var(--ap-border);
+}
+
+.apweb-dock-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  z-index: 2;
+  cursor: col-resize;
+  background: transparent;
+  touch-action: none;
+}
+
+.apweb-dock-handle:hover,
+.apweb-dock-handle:active {
+  background: hsla(160, 100%, 37%, 0.3);
+}
+
+.apweb-dock-handle[hidden] {
+  display: none;
+}
+
+.apweb-scope--dock-right .apweb-dock-handle {
+  left: 0;
+}
+
+.apweb-scope--dock-left .apweb-dock-handle {
+  right: 0;
+}
+
+/* A docked panel is pinned to its edge, so the header is not a drag handle. */
+.apweb-scope--dock .apweb-panel__head {
+  cursor: default;
+}
+
+.apweb-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.9rem;
+  border-bottom: 1px solid var(--ap-border);
+  background: var(--ap-bg-soft);
+  cursor: move;
+  user-select: none;
+  /* Dragging by the header must not scroll the page on touch devices. */
+  touch-action: none;
+}
+
+.apweb-scope--embed .apweb-panel__head {
+  cursor: default;
+}
+
+.apweb-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+
+.apweb-title strong {
+  flex-shrink: 0;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.apweb-title__model {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 9rem;
+  min-width: 0;
+  font-size: 0.72rem;
+  color: var(--ap-text-soft);
+}
+
+.apweb-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--ap-border-hover);
+}
+
+.apweb-dot--live {
+  background: var(--ap-accent);
+  animation: apweb-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes apweb-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.apweb-head-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.15rem;
+}
+
+.apweb-head-actions button {
+  height: 1.8rem;
+  min-width: 1.8rem;
+  padding: 0 0.4rem;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: inherit;
+  font-size: 0.78rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.apweb-head-actions button:hover {
+  background: var(--ap-bg-mute);
+}
+
+/* ------------------- prominent 「划词即问」 control (in settings) -------------- */
+
+.apweb-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--ap-border);
+  border-radius: 0.5rem;
+  background: var(--ap-bg-mute);
+}
+
+.apweb-mode__btn {
+  width: 100%;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--ap-accent);
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--ap-accent);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.apweb-mode__btn:hover {
+  background: hsla(160, 100%, 37%, 0.14);
+}
+
+.apweb-mode__btn--on {
+  background: var(--ap-accent);
+  color: var(--ap-accent-ink);
+}
+
+.apweb-mode__btn--on:hover {
+  background: var(--ap-accent);
+  filter: brightness(1.06);
+}
+
+.apweb-mode__hint {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--ap-text-soft);
+}
+
+/* -------------------------------- messages -------------------------------- */
+
+.apweb-msgs {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.apweb-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--ap-text-soft);
+}
+
+.apweb-msg__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--ap-text-soft);
+}
+
+.apweb-msg__context {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apweb-msg__copy {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 0.7rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.apweb-msg__body {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.55rem;
+  background: var(--ap-bg);
+  font-size: 0.84rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.apweb-msg--user .apweb-msg__body {
+  background: hsla(160, 100%, 37%, 0.14);
+}
+
+/* Markdown brings its own block structure; prose wrapping would add gaps. */
+.apweb-msg__body--md {
+  white-space: normal;
+}
+
+.apweb-msg__body--md :first-child {
+  margin-top: 0;
+}
+
+.apweb-msg__body--md :last-child {
+  margin-bottom: 0;
+}
+
+.apweb-msg__body--md p,
+.apweb-msg__body--md ul,
+.apweb-msg__body--md ol,
+.apweb-msg__body--md blockquote,
+.apweb-msg__body--md pre,
+.apweb-msg__body--md table {
+  margin: 0.5rem 0;
+}
+
+.apweb-msg__body--md h1,
+.apweb-msg__body--md h2,
+.apweb-msg__body--md h3,
+.apweb-msg__body--md h4,
+.apweb-msg__body--md h5,
+.apweb-msg__body--md h6 {
+  margin: 0.7rem 0 0.35rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.apweb-msg__body--md ul,
+.apweb-msg__body--md ol {
+  padding-left: 1.15rem;
+}
+
+.apweb-msg__body--md li {
+  margin: 0.15rem 0;
+}
+
+.apweb-msg__body--md code {
+  padding: 0.1rem 0.28rem;
+  border-radius: 0.25rem;
+  background: var(--ap-bg-mute);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+}
+
+.apweb-msg__body--md pre {
+  overflow-x: auto;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.4rem;
+  background: var(--ap-bg-mute);
+}
+
+.apweb-msg__body--md pre code {
+  padding: 0;
+  background: none;
+  font-size: 0.76rem;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.apweb-msg__body--md blockquote {
+  padding-left: 0.6rem;
+  border-left: 3px solid var(--ap-border-hover);
+  color: var(--ap-text-soft);
+}
+
+.apweb-msg__body--md table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.apweb-msg__body--md th,
+.apweb-msg__body--md td {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--ap-border);
+  text-align: left;
+}
+
+.apweb-msg__body--md th {
+  background: var(--ap-bg-mute);
+}
+
+.apweb-msg__body--md a {
+  color: hsla(160, 100%, 30%, 1);
+  text-decoration: underline;
+}
+
+@media (prefers-color-scheme: dark) {
+  .apweb-msg__body--md a {
+    color: hsla(160, 90%, 60%, 1);
+  }
+}
+
+.apweb-msg__body--md hr {
+  border: 0;
+  border-top: 1px solid var(--ap-border);
+}
+
+.apweb-thinking {
+  margin-bottom: 0.35rem;
+  border: 1px dashed var(--ap-border-hover);
+  border-radius: 0.5rem;
+  background: var(--ap-bg-mute);
+  font-size: 0.75rem;
+}
+
+.apweb-thinking summary {
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  color: var(--ap-text-soft);
+}
+
+.apweb-thinking p {
+  margin: 0;
+  padding: 0 0.6rem 0.5rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ap-text-soft);
+}
+
+.apweb-failure {
+  margin: 0 0.9rem 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.45rem;
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--ap-danger);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.apweb-failure[hidden] {
+  display: none;
+}
+
+/* -------------------------------- composer -------------------------------- */
+
+.apweb-composer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 0.9rem;
+  border-top: 1px solid var(--ap-border);
+  background: var(--ap-bg-soft);
+}
+
+.apweb-composer textarea {
+  flex: 1;
+  /* A <textarea> has a cols-based min-content width; without this it refuses to
+     shrink inside the flex row and pushes the send button out of the panel. */
+  min-width: 0;
+  resize: none;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--ap-border);
+  border-radius: 0.5rem;
+  background: var(--ap-bg);
+  color: var(--ap-text);
+  font-family: inherit;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.apweb-composer textarea:focus {
+  outline: 1px solid hsla(160, 100%, 37%, 0.8);
+  border-color: transparent;
+}
+
+.apweb-composer button {
+  /* Never squeezed: squeezed it wraps "发送" onto two lines and looks broken. */
+  flex-shrink: 0;
+  min-width: 3.4rem;
+  height: 2.3rem;
+  padding: 0 0.75rem;
+  white-space: nowrap;
+  border-radius: 0.5rem;
+  border: 0;
+  font-size: 0.84rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.apweb-send {
+  background: var(--ap-accent);
+  color: var(--ap-accent-ink);
+  font-weight: 600;
+}
+
+.apweb-send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.apweb-stop {
+  background: rgba(220, 38, 38, 0.15);
+  color: var(--ap-danger);
+}
+
+/* -------------------------------- settings -------------------------------- */
+
+.apweb-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--ap-border);
+  background: var(--ap-bg-soft);
+  /* The prompt editors make this form tall; let it scroll instead of squeezing
+     the conversation out of the panel. */
+  max-height: 62%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.apweb-settings[hidden] {
+  display: none;
+}
+
+.apweb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+}
+
+.apweb-field > span {
+  color: var(--ap-text);
+}
+
+.apweb-field input,
+.apweb-field select {
+  width: 100%;
+  height: 2.1rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--ap-border);
+  border-radius: 0.45rem;
+  background: var(--ap-bg);
+  color: var(--ap-text);
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
+.apweb-field input:focus,
+.apweb-field select:focus {
+  outline: 1px solid hsla(160, 100%, 37%, 0.8);
+  border-color: transparent;
+}
+
+.apweb-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+}
+
+.apweb-check input {
+  flex-shrink: 0;
+}
+
+.apweb-note {
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.45rem;
+  background: var(--ap-bg-mute);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--ap-text-soft);
+}
+
+.apweb-note--plain {
+  padding: 0 0.1rem;
+  background: transparent;
+}
+
+.apweb-hint-inline {
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--ap-text-soft);
+}
+
+.apweb-warn-inline {
+  font-size: 0.72rem;
+  color: var(--ap-danger);
+}
+
+.apweb-prompts {
+  border: 1px solid var(--ap-border);
+  border-radius: 0.45rem;
+  padding: 0.4rem 0.5rem 0.5rem;
+}
+
+.apweb-prompts > summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: var(--ap-text-soft);
+  padding: 0.15rem 0;
+}
+
+.apweb-prompts__group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+}
+
+.apweb-prompts__name,
+.apweb-prompts__text {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--ap-border);
+  border-radius: 0.4rem;
+  background: var(--ap-bg);
+  color: var(--ap-text);
+  font-family: inherit;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.apweb-prompts__text {
+  resize: vertical;
+}
+
+.apweb-prompts__name:focus,
+.apweb-prompts__text:focus {
+  outline: 1px solid hsla(160, 100%, 37%, 0.8);
+  border-color: transparent;
+}
+
+.apweb-prompts__actions {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.apweb-prompts__actions button {
+  flex: 1;
+  height: 1.75rem;
+  border: 1px solid var(--ap-border);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: inherit;
+  font-size: 0.72rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.apweb-prompts__actions button:hover:not(:disabled) {
+  background: var(--ap-bg-mute);
+}
+
+.apweb-prompts__actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.apweb-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+
+.apweb-actions button {
+  height: 2.1rem;
+  padding: 0 0.9rem;
+  border-radius: 0.45rem;
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.apweb-ghost {
+  border: 1px solid var(--ap-border);
+  background: transparent;
+  color: inherit;
+}
+
+.apweb-primary {
+  border: 0;
+  background: var(--ap-accent);
+  color: var(--ap-accent-ink);
+  font-weight: 600;
+}
+
+/* --------------------------- selection pill (float) ------------------------ */
+
+.apweb-pill {
+  position: fixed;
+  z-index: 2147483647;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.6rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ap-accent);
+  color: var(--ap-accent-ink);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1.4;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+}
+
+.apweb-pill[hidden] {
+  display: none;
+}
+
+.apweb-pill:hover {
+  filter: brightness(1.06);
+}
+
+.apweb-pill__dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--ap-accent-ink);
+  opacity: 0.7;
+}
+
+/* --------------------------- corner 「划词即问」 launcher ---------------------- */
+
+.apweb-launch {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  /* Just under the pill and the panel, so a selection near the corner still
+     gets its button on top. */
+  z-index: 2147483645;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ap-accent);
+  color: var(--ap-accent-ink);
+  font-family: inherit;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.92;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  transition: transform 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
+}
+
+.apweb-launch:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.apweb-launch:active {
+  transform: translateY(0);
+}
+
+.apweb-launch[hidden] {
+  display: none;
+}
+
+.apweb-launch--on {
+  box-shadow:
+    0 0 0 3px hsla(160, 100%, 37%, 0.35),
+    0 0 0 7px hsla(160, 100%, 37%, 0.16),
+    0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.apweb-launch__glyph {
+  pointer-events: none;
+}
