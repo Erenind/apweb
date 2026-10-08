@@ -135,6 +135,21 @@
 
     const contextMode = merged.contextMode === 'page' ? 'page' : 'paragraph'
 
+    // The panel's last geometry, kept only if it is complete — a half-written
+    // record would place the panel at NaN.
+    const storedRect = merged.panelRect
+    const panelRect =
+      storedRect &&
+      typeof storedRect === 'object' &&
+      ['left', 'top', 'width', 'height'].every((key) => Number.isFinite(storedRect[key]))
+        ? {
+            left: storedRect.left,
+            top: storedRect.top,
+            width: storedRect.width,
+            height: storedRect.height,
+          }
+        : null
+
     return {
       ...DEFAULT_SETTINGS,
       ...merged,
@@ -143,6 +158,7 @@
       thinkingByProvider,
       thinking: thinkingByProvider[merged.providerId] ?? false,
       contextMode,
+      panelRect,
       selectionTrigger,
       composerPrompts,
       composerPromptId:
@@ -180,8 +196,8 @@
 
   /**
    * Notify subscribers. `meta.remote` marks a change that came from another
-   * context (the sidebar, the options page, another tab) rather than from this
-   * one — the panel uses it to know when to rebuild its message list.
+   * context (the options page, another tab) rather than from this one — the panel
+   * uses it to know when to rebuild its message list.
    */
   function emit(meta) {
     for (const fn of [...listeners]) {
@@ -210,9 +226,9 @@
     return state
   }
 
-  // Keep every surface in step: the in-page panel, the browser sidebar, the
-  // options page and other tabs all read and write this one store, so a change
-  // made in any of them has to reach the others.
+  // Keep every surface in step: the in-page panel, the options page and other
+  // tabs all read and write this one store, so a change made in any of them has
+  // to reach the others.
   api.storage?.onChanged?.addListener((changes, area) => {
     if (area !== 'local') return
     let touched = false

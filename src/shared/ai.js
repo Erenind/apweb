@@ -49,6 +49,10 @@
     includePageText: true,
     // 'paragraph' = the block around the selection, 'page' = the whole page.
     contextMode: 'paragraph',
+    // Where and how big the floating panel was left, in viewport pixels:
+    // { left, top, width, height }. null until the panel is first moved or
+    // resized, so a fresh install uses the default top-right card.
+    panelRect: null,
     // DeepSeek's own default is thinking on, but that makes every question wait
     // for a reasoning pass; a reading assistant wants quick answers.
     thinking: false,

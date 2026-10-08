@@ -45,16 +45,6 @@
       "96": "icons/icon-96.png"
     }
   },
-  "sidebar_action": {
-    "default_title": "AI 助手",
-    "default_panel": "src/sidebar/sidebar.html",
-    "default_icon": {
-      "16": "icons/icon-16.png",
-      "32": "icons/icon-32.png",
-      "48": "icons/icon-48.png",
-      "96": "icons/icon-96.png"
-    }
-  },
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",

@@ -213,28 +213,13 @@
 
   /**
    * Ask about a selection. The context is built here, in the page, because only
-   * the page can read it; then the question goes to whichever surface should
-   * answer it — the browser sidebar when it is open, otherwise the in-page panel.
+   * the page can read it; the panel then opens wherever it was last left and
+   * answers.
    */
-  async function askSelection(text, action) {
+  function askSelection(text, action) {
     if (!panel) return
     const built = panel.buildSelectionContext(text)
-    const payload = {
-      text,
-      action,
-      context: built.context,
-      contextInfo: built.contextInfo,
-      title: document.title,
-      url: location.href,
-    }
-
-    try {
-      const reply = await api.runtime.sendMessage({ t: 'apweb:selection', payload })
-      if (reply?.handled) return
-    } catch {
-      // No background listener (e.g. the extension is reloading): answer here.
-    }
-    await panel.askSelection(payload)
+    void panel.askSelection({ text, action, context: built.context, contextInfo: built.contextInfo })
   }
 
   /* ------------------------------ selection flow ----------------------------- */
@@ -301,7 +286,11 @@
     window.addEventListener('scroll', hidePill, true)
     window.addEventListener('resize', hidePill, true)
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') hidePill()
+      if (event.key !== 'Escape') return
+      hidePill()
+      // Inside the panel Esc is handled by the panel itself; this covers the case
+      // where focus is still on the page.
+      if (panel?.isOpen()) panel.setOpen(false)
     })
   }
 
@@ -314,8 +303,7 @@
 
     // The panel's open state is per tab (kept by the background), not a global
     // setting: a fresh tab starts closed, while navigating inside a tab keeps
-    // whatever you left there. The browser sidebar is a separate surface and is
-    // not affected by this at all.
+    // whatever you left there.
     let startOpen = false
     try {
       const reply = await api.runtime.sendMessage({ t: 'apweb:panel-state' })
@@ -344,10 +332,6 @@
       if (message?.t === 'apweb:toggle-panel') {
         panel.toggle()
         if (panel.isOpen()) panel.focusComposer()
-      } else if (message?.t === 'apweb:sidebar-opened') {
-        // The sidebar is the better surface for this conversation, so the floating
-        // panel gets out of its way.
-        if (panel.isOpen()) panel.setOpen(false)
       }
     })
   }

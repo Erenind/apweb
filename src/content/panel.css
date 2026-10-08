@@ -62,7 +62,37 @@
   background: var(--ap-bg-soft);
   color: var(--ap-text);
   box-shadow: var(--ap-shadow);
-  resize: both;
+  /* Resizing is done by our own grip, which can report when the drag ends so the
+     size can be saved; the browser's corner resizer cannot. */
+  resize: none;
+}
+
+/* Drag grip for the panel size, in the bottom-right corner. */
+.apweb-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  /* Small enough to leave the send button's corner clickable. */
+  width: 14px;
+  height: 14px;
+  z-index: 3;
+  cursor: nwse-resize;
+  touch-action: none;
+  /* Three diagonal ticks, drawn with a gradient so no image is needed. */
+  background-image: linear-gradient(
+    135deg,
+    transparent 0 45%,
+    var(--ap-border-hover) 45% 55%,
+    transparent 55% 70%,
+    var(--ap-border-hover) 70% 80%,
+    transparent 80%
+  );
+  opacity: 0.9;
+}
+
+.apweb-resize-handle:hover,
+.apweb-resize-handle:active {
+  opacity: 1;
 }
 
 .apweb-panel[hidden] {
@@ -75,20 +105,6 @@
   width: 100%;
   height: min(720px, calc(100vh - 40px));
   margin: 0 auto;
-  resize: none;
-}
-
-/* Native browser sidebar: fill the panel Firefox gives us, edge to edge. */
-.apweb-scope--fill .apweb-panel {
-  position: relative;
-  inset: auto;
-  width: 100%;
-  height: 100vh;
-  min-height: 0;
-  margin: 0;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
   resize: none;
 }
 
@@ -175,11 +191,6 @@
 
 .apweb-head-actions button:hover {
   background: var(--ap-bg-mute);
-}
-
-/* Browser sidebar: no title row, so the actions sit on their own at the end. */
-.apweb-panel__head--titleless {
-  justify-content: flex-end;
 }
 
 /* ------------------- prominent 「划词即问」 control (in settings) -------------- */
@@ -547,10 +558,51 @@
   align-items: center;
   gap: 0.45rem;
   font-size: 0.8rem;
+  cursor: pointer;
 }
 
-.apweb-check input {
+/* Switches, not checkboxes: the native control is restyled as a track + thumb so
+   the on/off state reads at a glance. Kept as a real <input type=checkbox> for
+   keyboard and screen-reader behaviour. */
+.apweb-switch {
+  position: relative;
   flex-shrink: 0;
+  width: 2.3rem;
+  height: 1.25rem;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ap-border-hover);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.apweb-switch::after {
+  content: '';
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease;
+}
+
+.apweb-switch:checked {
+  background: var(--ap-accent);
+}
+
+.apweb-switch:checked::after {
+  transform: translateX(1.05rem);
+}
+
+.apweb-switch:focus-visible {
+  outline: 2px solid hsla(160, 100%, 37%, 0.8);
+  outline-offset: 2px;
 }
 
 .apweb-note {

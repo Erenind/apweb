@@ -402,7 +402,6 @@ globalThis.browser = {
     onMessage: { addListener: (fn) => contentMessageListeners.push(fn) },
     sendMessage: async (message) => {
       sentToBackground.push(message)
-      if (message?.t === 'apweb:selection') return { handled: false }
       if (message?.t === 'apweb:panel-state') return { open: tabPanelOpen }
       if (message?.t === 'apweb:set-panel-state') {
         tabPanelOpen = message.open === true
@@ -420,7 +419,7 @@ function dispatchToContent(message) {
   for (const fn of [...contentMessageListeners]) fn(message)
 }
 
-/** Simulate another surface (sidebar / options / another tab) writing storage. */
+/** Simulate another surface (options page / another tab) writing storage. */
 function remoteWrite(key, value) {
   storage[key] = value
   for (const fn of storageListeners) fn({ [key]: { newValue: value } }, 'local')
@@ -481,6 +480,13 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   check('settings has providers select', settingsEl.querySelectorAll('select').length >= 4)
   check('settings rendered inputs', settingsEl.querySelectorAll('input').length >= 4)
   check('settings has prompt editors', !!settingsEl.querySelector('.apweb-prompts'))
+  check(
+    'checkboxes are rendered as switches',
+    settingsEl
+      .querySelectorAll('input')
+      .filter((i) => i.type === 'checkbox')
+      .every((i) => i.classList.contains('apweb-switch')),
+  )
 
   console.log('prompt editors start folded')
   const prompts = settingsEl.querySelector('.apweb-prompts')
@@ -618,6 +624,21 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   console.log('drag by the header')
   const contentPanel = host.shadowRoot.querySelector('.apweb-panel')
   const dragHead = host.shadowRoot.querySelector('.apweb-panel__head')
+  // Make the shim's rect reflect the panel's inline styles, so the geometry the
+  // drag/resize code reads back and saves is the geometry it just set.
+  contentPanel.getBoundingClientRect = () => {
+    const px = (value, fallback) => {
+      const n = parseFloat(value)
+      return Number.isFinite(n) ? n : fallback
+    }
+    const width = px(contentPanel.style.width, 380)
+    const height = px(contentPanel.style.height, 600)
+    // No inline left means the stylesheet's `right: 16px` is still in charge.
+    const anchoredRight = !contentPanel.style.left
+    const left = anchoredRight ? 1200 - px(contentPanel.style.right, 16) - width : px(contentPanel.style.left, 10)
+    const top = px(contentPanel.style.top, 16)
+    return { left, top, right: left + width, bottom: top + height, width, height }
+  }
   check('drag handle present', !!dragHead)
   dragHead.dispatch('pointerdown', {
     button: 0,
@@ -632,13 +653,63 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   dragHead.dispatch('pointermove', { pointerId: 7, clientX: 260, clientY: 180 })
   check(
     'panel follows the pointer',
-    contentPanel.style.left === '170px' && contentPanel.style.top === '90px',
+    // started at 1200 - 16 - 380 = 804, moved +160/+80, clamped to the window.
+    contentPanel.style.left === '812px' && contentPanel.style.top === '96px',
   )
   check('panel switches off its right anchor', contentPanel.style.right === 'auto')
   dragHead.dispatch('pointerup', { pointerId: 7 })
   dragHead.dispatch('pointermove', { pointerId: 7, clientX: 620, clientY: 520 })
-  check('drag ends on pointerup', contentPanel.style.left === '170px')
+  check('drag ends on pointerup', contentPanel.style.left === '812px')
   check('window drag listeners removed', (globalThis._listeners.pointermove ?? []).length === 0)
+  check(
+    'the position is saved',
+    AIStore.state.settings.panelRect?.left === 812 && AIStore.state.settings.panelRect?.top === 96,
+  )
+
+  console.log('resize grip')
+  const resizeHandle = host.shadowRoot.querySelector('.apweb-resize-handle')
+  check('resize grip present', !!resizeHandle)
+  resizeHandle.dispatch('pointerdown', { button: 0, pointerId: 9, clientX: 812, clientY: 96, target: resizeHandle })
+  resizeHandle.dispatch('pointermove', { pointerId: 9, clientX: 912, clientY: 136 })
+  check(
+    'the panel grows with the grip',
+    contentPanel.style.width === '480px' && contentPanel.style.height === '640px',
+  )
+  resizeHandle.dispatch('pointerup', { pointerId: 9 })
+  check(
+    'the size is saved',
+    AIStore.state.settings.panelRect?.width === 480 && AIStore.state.settings.panelRect?.height === 640,
+  )
+  check('window resize listeners removed', (globalThis._listeners.pointermove ?? []).length === 0)
+
+  console.log('esc hides the panel')
+  check('the panel is open', host.shadowRoot.querySelector('.apweb-panel').hidden === false)
+  host.shadowRoot.querySelector('.apweb-scope').dispatch('keydown', { key: 'Escape' })
+  check('esc inside the panel closes it', host.shadowRoot.querySelector('.apweb-panel').hidden === true)
+
+  // Reopen through the pill, then close with Esc while focus is on the page: the
+  // panel stops key events, so the page-level listener is the only one that can
+  // see those.
+  shadowPill.dispatch('click', { composedPath: () => [shadowPill] })
+  await tick()
+  check('the pill reopens the panel', host.shadowRoot.querySelector('.apweb-panel').hidden === false)
+  document.dispatch('keydown', { key: 'Escape' })
+  check('esc on the page closes it', host.shadowRoot.querySelector('.apweb-panel').hidden === true)
+
+  console.log('geometry is restored')
+  const restored = AIPanel.createPanel({ startOpen: true })
+  const restoredPanel = restored.el.querySelector('.apweb-panel')
+  check(
+    'a new panel opens where the last one was left',
+    // 812 + the new 480px width would hang off a 1200px window, so the restore
+    // clamps back to 712 to keep the whole panel on screen.
+    restoredPanel.style.left === '712px' && restoredPanel.style.top === '96px',
+  )
+  check(
+    'and at the size the last one was left',
+    restoredPanel.style.width === '480px' && restoredPanel.style.height === '640px',
+  )
+  restored.destroy()
 
   // Encodes the root cause of the stuck-drag bug: because the panel calls
   // stopPropagation on mouse events, a bubble-phase listener on window never
@@ -658,13 +729,6 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   globalThis.removeEventListener('mouseup', captureProbe, true)
   check('panel blocks bubble-phase listeners on window', bubbleSaw === false)
   check('capture-phase listener on window still fires', captureSaw === true)
-
-  console.log('sidebar takes over')
-  check('the floating panel is still open', host.shadowRoot.querySelector('.apweb-panel').hidden === false)
-  dispatchToContent({ t: 'apweb:sidebar-opened' })
-  await tick()
-  check('opening the sidebar closes the floating panel', host.shadowRoot.querySelector('.apweb-panel').hidden === true)
-  check('and that closure is recorded for the tab', tabPanelOpen === false)
 
   console.log('per-tab panel state')
   // A fresh content script (i.e. a new page in this tab) reads the state back.

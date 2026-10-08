@@ -159,12 +159,37 @@
     return error
   }
 
+  /* ------------------------------ panel geometry ----------------------------- */
+
+  // Bounds for the floating panel. The stored geometry is clamped against the
+  // current window whenever it is restored, so a panel dragged on a big screen
+  // cannot come back off-screen on a small one.
+  const MIN_PANEL_WIDTH = 300
+  const MIN_PANEL_HEIGHT = 240
+  const PANEL_MARGIN = 8
+  const PANEL_HEAD_KEEP = 60
+
+  function clampPanelRect(rect, viewport) {
+    const maxWidth = Math.max(MIN_PANEL_WIDTH, viewport.width - PANEL_MARGIN * 2)
+    const maxHeight = Math.max(MIN_PANEL_HEIGHT, viewport.height - PANEL_MARGIN * 2)
+    const width = Math.min(Math.max(Math.round(rect.width), MIN_PANEL_WIDTH), maxWidth)
+    const height = Math.min(Math.max(Math.round(rect.height), MIN_PANEL_HEIGHT), maxHeight)
+    const left = Math.min(
+      Math.max(PANEL_MARGIN, Math.round(rect.left)),
+      Math.max(PANEL_MARGIN, viewport.width - width - PANEL_MARGIN),
+    )
+    const top = Math.min(
+      Math.max(PANEL_MARGIN, Math.round(rect.top)),
+      Math.max(PANEL_MARGIN, viewport.height - PANEL_HEAD_KEEP),
+    )
+    return { left, top, width, height }
+  }
+
   /* --------------------------------- the panel ------------------------------- */
 
   function createPanel(options) {
     const opts = options ?? {}
     const embed = Boolean(opts.embed)
-    const fill = Boolean(opts.fill)
     const getSelection = opts.getSelection ?? (() => '')
     const describeContext = opts.describeContext ?? (() => null)
     const pageInfo = opts.pageInfo ?? (() => ({ title: document.title, url: location.href }))
@@ -190,7 +215,7 @@
     /* -------------------------------- structure ------------------------------- */
 
     const scope = h('div', {
-      class: `apweb-scope${embed ? ' apweb-scope--embed' : ''}${fill ? ' apweb-scope--fill' : ''}`,
+      class: `apweb-scope${embed ? ' apweb-scope--embed' : ''}`,
     })
 
     refs.model = h('span', { class: 'apweb-title__model' })
@@ -214,22 +239,14 @@
       on: { click: () => setOpen(false) },
     })
 
-    // The browser sidebar already says what it is and is closed by the browser's
-    // own control, so it keeps only the actions (todo: no title / no ✕ there).
-    const head = h(
-      'header',
-      { class: `apweb-panel__head${opts.hideTitle ? ' apweb-panel__head--titleless' : ''}` },
-      [
-      opts.hideTitle
-        ? null
-        : h('div', { class: 'apweb-title' }, [refs.dot, h('strong', { text: 'AI 助手' }), refs.model]),
+    const head = h('header', { class: 'apweb-panel__head' }, [
+      h('div', { class: 'apweb-title' }, [refs.dot, h('strong', { text: 'AI 助手' }), refs.model]),
       h('div', { class: 'apweb-head-actions' }, [
         refs.settingsBtn,
         refs.clearBtn,
-        embed || opts.hideClose || opts.hideTitle ? null : closeBtn,
+        embed || opts.hideClose ? null : closeBtn,
       ]),
-      ],
-    )
+    ])
 
     refs.settingsEl = h('div', { class: 'apweb-settings', hidden: true })
     refs.msgs = h('div', { class: 'apweb-msgs' })
@@ -276,7 +293,29 @@
 
     scope.appendChild(refs.panel)
     isolate(scope)
-    if (!embed) enableDrag(head, refs.panel)
+    // Esc hides the panel. The listener has to sit on the scope: the panel stops
+    // key events from reaching the page, so a page-level listener would never see
+    // Esc pressed while the composer has focus.
+    scope.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || !open) return
+      event.preventDefault()
+      setOpen(false)
+    })
+
+    if (!embed) {
+      // A grip of our own instead of CSS `resize`: it is visible, it cannot be
+      // confused with the browser's corner resizer, and — because we own the
+      // drag — the size is saved exactly when the user finishes resizing.
+      refs.resizeHandle = h('div', {
+        class: 'apweb-resize-handle',
+        title: '拖动调整大小',
+        'data-field': 'resize-handle',
+      })
+      refs.panel.appendChild(refs.resizeHandle)
+      enableDrag(head, refs.panel)
+      enableResize(refs.resizeHandle, refs.panel)
+      applyStoredRect()
+    }
 
     /* --------------------------------- helpers -------------------------------- */
 
@@ -308,6 +347,108 @@
 
     function toggle() {
       setOpen(!open)
+    }
+
+    function viewport() {
+      return { width: window.innerWidth, height: window.innerHeight }
+    }
+
+    /** Restore the panel where and at the size the user last left it. */
+    function applyStoredRect() {
+      const stored = S().panelRect
+      if (!stored) return
+      const rect = clampPanelRect(stored, viewport())
+      refs.panel.style.left = `${rect.left}px`
+      refs.panel.style.top = `${rect.top}px`
+      refs.panel.style.right = 'auto'
+      refs.panel.style.width = `${rect.width}px`
+      refs.panel.style.height = `${rect.height}px`
+    }
+
+    /** Where the panel is right now, in viewport pixels. */
+    function currentRect() {
+      const rect = refs.panel.getBoundingClientRect()
+      return clampPanelRect(
+        { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        viewport(),
+      )
+    }
+
+    function saveRect() {
+      update({ panelRect: currentRect() })
+    }
+
+    /**
+     * Drag the bottom-right grip to resize. Like the header drag, the move/up
+     * listeners sit on `window` in the capture phase: the panel stops pointer
+     * events from reaching the page, so a bubble-phase listener would never see
+     * the release.
+     */
+    function enableResize(handle, panel) {
+      let resizing = false
+      let pointerId = null
+      let startX = 0
+      let startY = 0
+      let startWidth = 0
+      let startHeight = 0
+
+      const onMove = (event) => {
+        if (!resizing) return
+        if (pointerId !== null && event.pointerId !== undefined && event.pointerId !== pointerId) return
+        const size = clampPanelRect(
+          {
+            left: 0,
+            top: 0,
+            width: startWidth + (event.clientX - startX),
+            height: startHeight + (event.clientY - startY),
+          },
+          viewport(),
+        )
+        panel.style.width = `${size.width}px`
+        panel.style.height = `${size.height}px`
+      }
+
+      const endResize = (event) => {
+        if (!resizing) return
+        if (event && pointerId !== null && event.pointerId !== undefined && event.pointerId !== pointerId) {
+          return
+        }
+        const id = pointerId
+        resizing = false
+        pointerId = null
+        window.removeEventListener('pointermove', onMove, true)
+        window.removeEventListener('pointerup', endResize, true)
+        window.removeEventListener('pointercancel', endResize, true)
+        window.removeEventListener('blur', endResize, true)
+        try {
+          if (id !== null) handle.releasePointerCapture?.(id)
+        } catch {
+          // already released
+        }
+        saveRect()
+      }
+
+      handle.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return
+        const rect = panel.getBoundingClientRect()
+        resizing = true
+        pointerId = event.pointerId ?? null
+        startX = event.clientX
+        startY = event.clientY
+        startWidth = rect.width
+        startHeight = rect.height
+        event.preventDefault()
+        event.stopPropagation()
+        try {
+          if (event.pointerId !== undefined) handle.setPointerCapture?.(event.pointerId)
+        } catch {
+          // capture is optional; the window listeners keep the resize alive
+        }
+        window.addEventListener('pointermove', onMove, true)
+        window.addEventListener('pointerup', endResize, true)
+        window.addEventListener('pointercancel', endResize, true)
+        window.addEventListener('blur', endResize, true)
+      })
     }
 
     function syncHeader() {
@@ -490,8 +631,8 @@
 
     /**
      * The context a selection turn would attach, as a ready-made payload.
-     * Exposed so the content script can hand the exact same context to the
-     * browser sidebar, which has no page DOM of its own to read.
+     * Exposed so the content script can decide whether a short selection gets
+     * context before the panel opens.
      */
     function buildSelectionContext(text) {
       const settings = S()
@@ -654,8 +795,8 @@
       const settings = S()
       const action = selection.action ?? settings.selectionAction
       const ask = AICore.findPrompt(settings.selectionPrompts, action)?.text ?? ''
-      // A caller that already has the page (the content script, relaying to the
-      // sidebar) can pass the context in; otherwise build it from this document.
+      // The content script has the page and passes the context in; when the call
+      // comes from the panel's own composer, build it from this document.
       const prebuilt =
         typeof selection.context === 'string' && selection.contextInfo !== undefined
       const built = prebuilt
@@ -831,8 +972,10 @@
       refs.settingsEl.appendChild(
         h('label', { class: 'apweb-check' }, [
           h('input', {
+            class: 'apweb-switch',
             type: 'checkbox',
             checked: settings.includePageText,
+            'data-field': 'include-page-text',
             on: { change: (event) => update({ includePageText: event.target.checked }) },
           }),
           h('span', { text: '发送时附带页面内容' }),
@@ -857,6 +1000,7 @@
       // Thinking ---------------------------------------------------------------
       refs.thinkingRow = h('label', { class: 'apweb-check' }, [
         h('input', {
+          class: 'apweb-switch',
           type: 'checkbox',
           checked: settings.thinking,
           'data-field': 'thinking',
@@ -1087,16 +1231,20 @@
       const onMove = (event) => {
         if (!dragging) return
         if (pointerId !== null && event.pointerId !== undefined && event.pointerId !== pointerId) return
-        const left = Math.min(
-          Math.max(0, originLeft + event.clientX - startX),
-          Math.max(0, window.innerWidth - panel.offsetWidth),
+        const rect = panel.getBoundingClientRect()
+        // Clamped with the same helper that saves the rect, so a drag to the edge
+        // does not get silently nudged the next time the panel is restored.
+        const next = clampPanelRect(
+          {
+            left: originLeft + event.clientX - startX,
+            top: originTop + event.clientY - startY,
+            width: rect.width,
+            height: rect.height,
+          },
+          viewport(),
         )
-        const top = Math.min(
-          Math.max(0, originTop + event.clientY - startY),
-          Math.max(0, window.innerHeight - 40),
-        )
-        panel.style.left = `${left}px`
-        panel.style.top = `${top}px`
+        panel.style.left = `${next.left}px`
+        panel.style.top = `${next.top}px`
         panel.style.right = 'auto'
       }
 
@@ -1117,6 +1265,7 @@
         } catch {
           // The capture was already released (or never taken).
         }
+        saveRect()
       }
 
       handle.addEventListener('pointerdown', (event) => {
@@ -1148,8 +1297,8 @@
       syncHeader()
       refreshModeControl()
       syncComposer()
-      // A change that came from another surface (sidebar / options / another
-      // tab) has to be reflected in the transcript too.
+      // A change that came from another surface (options page / another tab) has
+      // to be reflected in the transcript too.
       if (meta?.remote) renderMessages()
     })
 
