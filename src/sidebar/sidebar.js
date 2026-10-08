@@ -14,24 +14,14 @@
     embed: true,
     fill: true,
     startOpen: true,
+    // The browser already labels the sidebar and gives it a close control, so the
+    // panel's own title row and ✕ would be noise.
+    hideTitle: true,
     hideClose: true,
   })
   document.getElementById('app').appendChild(panel.el)
 
   const port = api.runtime.connect({ name: 'apweb-sidebar' })
-
-  // Tell the background whether this sidebar is actually on screen: a sidebar
-  // that is merely loaded (bfcache) must not swallow questions meant for the
-  // in-page panel.
-  function reportVisibility() {
-    try {
-      port.postMessage({ t: 'apweb:sidebar-state', visible: document.visibilityState === 'visible' })
-    } catch {
-      // port closed
-    }
-  }
-  reportVisibility()
-  document.addEventListener('visibilitychange', reportVisibility)
 
   port.onMessage.addListener((message) => {
     if (message?.t === 'apweb:selection' && message.payload) {

@@ -24,10 +24,6 @@
 
   const { DEFAULT_SETTINGS, apiKeySlot, findPrompt, providerById } = AICore
 
-  const PANEL_MODES = new Set(['floating', 'right', 'left'])
-  const MIN_DOCK = 280
-  const MAX_DOCK = 2000
-
   async function read(key, fallback) {
     try {
       const result = await api.storage.local.get(key)
@@ -139,12 +135,6 @@
 
     const contextMode = merged.contextMode === 'page' ? 'page' : 'paragraph'
 
-    const panelMode = PANEL_MODES.has(merged.panelMode) ? merged.panelMode : DEFAULT_SETTINGS.panelMode
-    const dockWidth = Math.min(
-      Math.max(Math.round(Number(merged.dockWidth) || DEFAULT_SETTINGS.dockWidth), MIN_DOCK),
-      MAX_DOCK,
-    )
-
     return {
       ...DEFAULT_SETTINGS,
       ...merged,
@@ -153,9 +143,6 @@
       thinkingByProvider,
       thinking: thinkingByProvider[merged.providerId] ?? false,
       contextMode,
-      panelMode,
-      panelOpen: merged.panelOpen === true,
-      dockWidth,
       selectionTrigger,
       composerPrompts,
       composerPromptId:

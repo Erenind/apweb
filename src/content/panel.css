@@ -92,64 +92,6 @@
   resize: none;
 }
 
-/* ------------------------------ docked layout ------------------------------ */
-
-/* Docked: full height against one edge; the width is an inline style driven by
-   the grip below (CSS `resize` would only offer a bottom-right corner handle). */
-.apweb-scope--dock .apweb-panel {
-  top: 0;
-  bottom: 0;
-  height: 100%;
-  border-radius: 0;
-  box-shadow: none;
-  resize: none;
-}
-
-.apweb-scope--dock-right .apweb-panel {
-  right: 0;
-  left: auto;
-  border-left: 1px solid var(--ap-border);
-}
-
-.apweb-scope--dock-left .apweb-panel {
-  left: 0;
-  right: auto;
-  border-right: 1px solid var(--ap-border);
-}
-
-.apweb-dock-handle {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 6px;
-  z-index: 2;
-  cursor: col-resize;
-  background: transparent;
-  touch-action: none;
-}
-
-.apweb-dock-handle:hover,
-.apweb-dock-handle:active {
-  background: hsla(160, 100%, 37%, 0.3);
-}
-
-.apweb-dock-handle[hidden] {
-  display: none;
-}
-
-.apweb-scope--dock-right .apweb-dock-handle {
-  left: 0;
-}
-
-.apweb-scope--dock-left .apweb-dock-handle {
-  right: 0;
-}
-
-/* A docked panel is pinned to its edge, so the header is not a drag handle. */
-.apweb-scope--dock .apweb-panel__head {
-  cursor: default;
-}
-
 .apweb-panel__head {
   display: flex;
   align-items: center;
@@ -233,6 +175,11 @@
 
 .apweb-head-actions button:hover {
   background: var(--ap-bg-mute);
+}
+
+/* Browser sidebar: no title row, so the actions sit on their own at the end. */
+.apweb-panel__head--titleless {
+  justify-content: flex-end;
 }
 
 /* ------------------- prominent 「划词即问」 control (in settings) -------------- */
@@ -765,55 +712,4 @@
   border-radius: 50%;
   background: var(--ap-accent-ink);
   opacity: 0.7;
-}
-
-/* --------------------------- corner 「划词即问」 launcher ---------------------- */
-
-.apweb-launch {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  /* Just under the pill and the panel, so a selection near the corner still
-     gets its button on top. */
-  z-index: 2147483645;
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--ap-accent);
-  color: var(--ap-accent-ink);
-  font-family: inherit;
-  font-size: 1.3rem;
-  line-height: 1;
-  cursor: pointer;
-  opacity: 0.92;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-  transition: transform 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
-}
-
-.apweb-launch:hover {
-  opacity: 1;
-  transform: translateY(-1px);
-}
-
-.apweb-launch:active {
-  transform: translateY(0);
-}
-
-.apweb-launch[hidden] {
-  display: none;
-}
-
-.apweb-launch--on {
-  box-shadow:
-    0 0 0 3px hsla(160, 100%, 37%, 0.35),
-    0 0 0 7px hsla(160, 100%, 37%, 0.16),
-    0 6px 20px rgba(0, 0, 0, 0.3);
-}
-
-.apweb-launch__glyph {
-  pointer-events: none;
 }

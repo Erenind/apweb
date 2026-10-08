@@ -17,20 +17,20 @@
   const api = globalThis.browser ?? globalThis.chrome
   const PORT_NAME = 'apweb-ai'
   const SIDEBAR_PORT = 'apweb-sidebar'
+  const PANEL_STATE_PREFIX = 'apweb.panel.'
 
-  // Live browser-sidebar panels. A selection is routed here when one is open, so
-  // the sidebar answers instead of the in-page panel (which would otherwise show
-  // the same answer twice).
+  // Live browser-sidebar panels. When one is open it answers selections instead of
+  // the floating in-page panel, which would otherwise answer the same question a
+  // second time (or, if it is closed, answer invisibly).
   const sidebarPorts = new Set()
 
   api.runtime.onConnect.addListener((port) => {
     if (port.name === SIDEBAR_PORT) {
-      port.apwebVisible = true
       sidebarPorts.add(port)
-      port.onMessage.addListener((message) => {
-        if (message?.t === 'apweb:sidebar-state') port.apwebVisible = Boolean(message.visible)
-      })
       port.onDisconnect.addListener(() => sidebarPorts.delete(port))
+      // Opening the sidebar takes over the conversation: every page closes its
+      // floating panel so there is exactly one place answers show up.
+      void closeFloatingPanels()
       return
     }
 
@@ -91,18 +91,40 @@
     }
   }
 
-  /**
-   * Route a selection question. Resolves `{ handled: true }` when at least one
-   * visible sidebar took it, so the content script knows to stay quiet.
-   */
-  api.runtime.onMessage.addListener((message) => {
-    if (message?.t !== 'apweb:selection') return undefined
-    return routeSelection(message)
+  /* ------------------------------ message routing ---------------------------- */
+
+  api.runtime.onMessage.addListener((message, sender) => {
+    if (!message || typeof message !== 'object') return undefined
+    if (message.t === 'apweb:selection') return routeSelection(message, sender)
+    if (message.t === 'apweb:panel-state') return readPanelState(sender)
+    if (message.t === 'apweb:set-panel-state') return writePanelState(sender, message.open === true)
+    return undefined
   })
 
-  function routeSelection(message) {
-    const inbox = [...sidebarPorts].filter((port) => port.apwebVisible)
+  /**
+   * Route a selection question. Resolves `{ handled: true }` when the sidebar
+   * took it, so the content script knows to stay quiet.
+   *
+   * `sidebarAction.isOpen` is the authority on whether the sidebar is showing: a
+   * panel document can stay alive (bfcache) after the sidebar is collapsed, and
+   * routing a question there would make it disappear. If the API is unavailable
+   * we fall back to "a port is connected".
+   */
+  async function routeSelection(message, sender) {
+    const inbox = [...sidebarPorts]
     if (!inbox.length) return { handled: false }
+
+    const windowId = sender?.tab?.windowId
+    if (api.sidebarAction?.isOpen && windowId !== undefined) {
+      let open = true
+      try {
+        open = await api.sidebarAction.isOpen({ windowId })
+      } catch {
+        // Older build without isOpen(): trust the connection.
+      }
+      if (!open) return { handled: false }
+    }
+
     for (const port of inbox) {
       try {
         port.postMessage({ t: 'apweb:selection', payload: message.payload })
@@ -113,36 +135,59 @@
     return { handled: true }
   }
 
-  /**
-   * Page zoom scales everything the page draws, including a content-script
-   * overlay. The panel asks for the tab's zoom so it can scale itself back to a
-   * constant on-screen size; `tabs.getZoom` needs no extra permission, and if it
-   * is unavailable the panel simply behaves as at 100%.
-   */
-  api.runtime.onMessage.addListener((message, sender) => {
-    if (message?.t !== 'apweb:get-zoom') return undefined
-    const tabId = sender?.tab?.id
-    const none = { zoom: 1 }
-    if (tabId === undefined || !api.tabs?.getZoom) return none
+  async function closeFloatingPanels() {
+    let tabs = []
     try {
-      return api.tabs.getZoom(tabId).then(
-        (zoom) => ({ zoom: Number.isFinite(zoom) && zoom > 0 ? zoom : 1 }),
-        () => none,
-      )
+      tabs = await api.tabs.query({})
     } catch {
-      return none
+      return
     }
-  })
+    for (const tab of tabs) {
+      if (tab?.id === undefined) continue
+      try {
+        await api.tabs.sendMessage(tab.id, { t: 'apweb:sidebar-opened' })
+      } catch {
+        // No content script there.
+      }
+    }
+  }
 
-  // Zooming after load has to reach the panel too, not just the next page load.
-  api.tabs?.onZoomChange?.addListener((info) => {
-    if (info?.tabId === undefined) return
-    const zoom = Number.isFinite(info.newZoomFactor) && info.newZoomFactor > 0 ? info.newZoomFactor : 1
-    Promise.resolve(
-      api.tabs.sendMessage(info.tabId, { t: 'apweb:zoom', zoom }),
-    ).catch(() => {
-      // No content script in that tab; nothing to update.
-    })
+  /* ------------------------------- panel state ------------------------------- */
+
+  // Whether the floating panel is showing, per tab: a new tab starts closed, while
+  // navigating inside a tab keeps the state you left. Kept in storage.session so
+  // it survives the background event page being suspended; tabs that close are
+  // swept out.
+  function stateKey(sender) {
+    const tabId = sender?.tab?.id
+    return tabId === undefined ? null : `${PANEL_STATE_PREFIX}${tabId}`
+  }
+
+  async function readPanelState(sender) {
+    const key = stateKey(sender)
+    if (!key || !api.storage?.session) return { open: false }
+    try {
+      const stored = await api.storage.session.get(key)
+      return { open: stored?.[key] === true }
+    } catch {
+      return { open: false }
+    }
+  }
+
+  async function writePanelState(sender, open) {
+    const key = stateKey(sender)
+    if (!key || !api.storage?.session) return { ok: false }
+    try {
+      await api.storage.session.set({ [key]: open })
+      return { ok: true }
+    } catch {
+      return { ok: false }
+    }
+  }
+
+  api.tabs?.onRemoved?.addListener((tabId) => {
+    if (!api.storage?.session) return
+    void api.storage.session.remove(`${PANEL_STATE_PREFIX}${tabId}`).catch(() => {})
   })
 
   api.action?.onClicked.addListener(async (tab) => {

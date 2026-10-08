@@ -60,22 +60,6 @@
     // clicked. 'auto' restores the reader's behaviour, 'off' disables it.
     //   'click' | 'auto' | 'off'
     selectionTrigger: 'click',
-    // Show a floating 「划词即问」 launcher in the corner of every page, so the
-    // feature can be started with one obvious click instead of via the toolbar
-    // and the settings dropdown.
-    showLauncher: true,
-    // How the assistant panel is placed.
-    //   'floating' — a card over the page
-    //   'right' / 'left' — docked to that edge, full height, resizable width
-    // Right-docked is the default: the panel then reads as a browser sidebar that
-    // the page yields space to, rather than a card floating over the content.
-    panelMode: 'right',
-    // Whether the panel is showing. Persisted so navigating to another page keeps
-    // the state you left the previous one in — and false on a fresh install, so
-    // enabling the add-on shows nothing until you ask for it.
-    panelOpen: false,
-    // Width in px of the docked panel, remembered across pages.
-    dockWidth: 400,
     // Which of `selectionPrompts` the button/auto-send uses, or 'off'.
     selectionAction: 'explain-translate',
     // Two prompt libraries, one per entry point. Edit them, add your own,
@@ -143,19 +127,6 @@
 
   /** A word or short phrase needs its surrounding text to be disambiguated. */
   const SHORT_SELECTION_LENGTH = 40
-
-  /** Docked panel sizing: never narrower than this, never wider than a ratio. */
-  const DOCK_MIN_WIDTH = 320
-  const DOCK_MAX_RATIO = 0.75
-
-  /** Clamp a requested dock width to something usable in the current viewport. */
-  function clampDockWidth(width, viewportWidth) {
-    const viewport = Number.isFinite(viewportWidth) && viewportWidth > 0 ? viewportWidth : 1280
-    const max = Math.max(DOCK_MIN_WIDTH, Math.round(viewport * DOCK_MAX_RATIO))
-    const value = Number(width)
-    if (!Number.isFinite(value)) return Math.min(400, max)
-    return Math.min(Math.max(Math.round(value), DOCK_MIN_WIDTH), max)
-  }
 
   function providerById(id) {
     return PROVIDERS.find((provider) => provider.id === id) ?? PROVIDERS[PROVIDERS.length - 1]
@@ -389,8 +360,5 @@
     thinkingBody,
     apiKeySlot,
     streamChat,
-    DOCK_MIN_WIDTH,
-    DOCK_MAX_RATIO,
-    clampDockWidth,
   }
 })()

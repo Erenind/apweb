@@ -37,8 +37,6 @@
   let panel = null
   let pill = null
   let pillLabel = null
-  let launcher = null
-  let pageZoom = 1
   let selTimer = null
   let pillText = ''
   let pillAction = ''
@@ -239,66 +237,6 @@
     await panel.askSelection(payload)
   }
 
-  /* -------------------------------- launcher -------------------------------- */
-
-  /**
-   * The prominent one-click way into the feature. It sits in the corner of every
-   * page so 「划词即问」 can be started without first opening the panel through
-   * the toolbar; it stays out of the way while the panel is open, because the
-   * panel carries the same toggle in its header.
-   */
-  function buildLauncher() {
-    launcher = document.createElement('button')
-    launcher.type = 'button'
-    launcher.className = 'apweb-launch'
-    launcher.hidden = true
-
-    const glyph = document.createElement('span')
-    glyph.className = 'apweb-launch__glyph'
-    glyph.textContent = '✦'
-    launcher.appendChild(glyph)
-
-    launcher.addEventListener('mousedown', (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-    })
-    launcher.addEventListener('click', (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-      if (!panel) return
-      panel.setSelectionAuto(!panel.isSelectionAuto())
-      // The toggle now lives inside the settings form, so open it: the click
-      // should show the switch it just flipped.
-      panel.setOpen(true)
-      panel.openSettings()
-    })
-
-    panel.el.appendChild(launcher)
-  }
-
-  function syncLauncher() {
-    if (!launcher || !panel) return
-    const settings = AIStore.state.settings
-    const on = settings.selectionTrigger === 'auto'
-    const visible = settings.showLauncher !== false && !panel.isOpen()
-    launcher.hidden = !visible
-    // The launcher is chrome, not page content: keep it the same size on screen
-    // however far the page is zoomed in.
-    launcher.style.transformOrigin = 'bottom right'
-    launcher.style.transform = pageZoom === 1 ? '' : `scale(${1 / pageZoom})`
-    launcher.classList.toggle('apweb-launch--on', on)
-    launcher.title = on
-      ? '划词即问已开启：选中文字就直接发给 AI（点击关闭并打开面板）'
-      : '启动划词即问：选中文字就直接发给 AI'
-  }
-
-  function setPageZoom(zoom) {
-    const value = Number(zoom)
-    pageZoom = Number.isFinite(value) && value > 0 ? value : 1
-    panel?.setPageZoom(pageZoom)
-    syncLauncher()
-  }
-
   /* ------------------------------ selection flow ----------------------------- */
 
   function scheduleSelectionCheck() {
@@ -374,46 +312,44 @@
     buildHost()
     await AIStore.load()
 
+    // The panel's open state is per tab (kept by the background), not a global
+    // setting: a fresh tab starts closed, while navigating inside a tab keeps
+    // whatever you left there. The browser sidebar is a separate surface and is
+    // not affected by this at all.
+    let startOpen = false
+    try {
+      const reply = await api.runtime.sendMessage({ t: 'apweb:panel-state' })
+      startOpen = reply?.open === true
+    } catch {
+      // No background yet: start closed.
+    }
+
     panel = AIPanel.createPanel({
       getSelection: selectionText,
       describeContext,
       pageInfo: () => ({ title: document.title, url: location.href }),
       onClose: () => hidePill(),
-      // Remembering this is what carries the panel's state across navigation.
-      startOpen: AIStore.state.settings.panelOpen,
+      startOpen,
       onOpenChange: (open) => {
-        AIStore.updateSettings({ panelOpen: open })
-        syncLauncher()
+        void api.runtime.sendMessage({ t: 'apweb:set-panel-state', open }).catch(() => {})
       },
     })
     panel.el.setAttribute('data-apweb', 'panel')
     shadow.appendChild(panel.el)
 
     buildPill()
-    buildLauncher()
-    syncLauncher()
-    AIStore.subscribe(() => syncLauncher())
     installSelectionListeners()
 
-    // Register before asking for the zoom, so a toolbar click during that round
-    // trip is not dropped.
     api.runtime.onMessage.addListener((message) => {
       if (message?.t === 'apweb:toggle-panel') {
         panel.toggle()
         if (panel.isOpen()) panel.focusComposer()
-      } else if (message?.t === 'apweb:zoom') {
-        setPageZoom(message.zoom)
+      } else if (message?.t === 'apweb:sidebar-opened') {
+        // The sidebar is the better surface for this conversation, so the floating
+        // panel gets out of its way.
+        if (panel.isOpen()) panel.setOpen(false)
       }
     })
-
-    // The panel is drawn by the page, so it has to know the page's zoom to keep a
-    // constant on-screen size.
-    try {
-      const reply = await api.runtime.sendMessage({ t: 'apweb:get-zoom' })
-      setPageZoom(reply?.zoom)
-    } catch {
-      setPageZoom(1)
-    }
   }
 
   void boot()

@@ -348,6 +348,8 @@ globalThis.getSelection = () => fakeSelection
 const storage = {}
 const ports = []
 const storageListeners = []
+const contentMessageListeners = []
+const sentToBackground = []
 
 function makePort(name) {
   const port = {
@@ -397,13 +399,25 @@ globalThis.browser = {
   runtime: {
     connect: ({ name }) => makePort(name),
     getURL: (path) => `moz-extension://test/${path}`,
-    onMessage: { addListener() {} },
+    onMessage: { addListener: (fn) => contentMessageListeners.push(fn) },
     sendMessage: async (message) => {
-      if (message?.t === 'apweb:get-zoom') return { zoom: 1 }
+      sentToBackground.push(message)
       if (message?.t === 'apweb:selection') return { handled: false }
+      if (message?.t === 'apweb:panel-state') return { open: tabPanelOpen }
+      if (message?.t === 'apweb:set-panel-state') {
+        tabPanelOpen = message.open === true
+        return { ok: true }
+      }
       return undefined
     },
   },
+}
+
+// What the background would hold for "is the floating panel showing in this tab".
+let tabPanelOpen = false
+
+function dispatchToContent(message) {
+  for (const fn of [...contentMessageListeners]) fn(message)
 }
 
 /** Simulate another surface (sidebar / options / another tab) writing storage. */
@@ -443,11 +457,8 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   await AIStore.load()
 
   console.log('first-run defaults')
-  check('panel is docked to the right by default', AIStore.state.settings.panelMode === 'right')
-  check('panel starts hidden on a fresh install', AIStore.state.settings.panelOpen === false)
-
-  // The rest of the harness drives the floating layout, so pin it explicitly.
-  AIStore.updateSettings({ panelMode: 'floating' })
+  check('there is no panel display-mode setting', !('panelMode' in AIStore.state.settings))
+  check('the floating panel starts closed', tabPanelOpen === false)
   AIStore.updateSettings({ providerId: 'deepseek', model: 'deepseek-flash', apiKey: 'sk-test' })
 
   console.log('panel construction')
@@ -562,23 +573,8 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   check('pill built in shadow root', !!shadowPill)
   check('pill starts hidden', shadowPill?.hidden === true)
 
-  const launcher = host?.shadowRoot?.querySelector('.apweb-launch')
-  check('launcher built in shadow root', !!launcher)
-  check('launcher visible while panel closed', launcher?.hidden === false)
-  launcher.dispatch('click', { composedPath: () => [launcher] })
-  check('launcher starts 划词即问', AIStore.state.settings.selectionTrigger === 'auto')
-  check('launcher opens the panel', host.shadowRoot.querySelector('.apweb-panel').hidden === false)
-  check('launcher reveals the settings toggle', host.shadowRoot.querySelector('.apweb-settings').hidden === false)
-  check('launcher hides while panel is open', launcher.hidden === true)
-  // Hand the panel back to the "click" mode the pill path expects.
-  AIStore.updateSettings({ selectionTrigger: 'click' })
-  host.shadowRoot
-    .querySelectorAll('button')
-    .find((b) => b.textContent === '✕')
-    .dispatch('click', {})
-  await tick()
-  check('panel closed again', host.shadowRoot.querySelector('.apweb-panel').hidden === true)
-  check('launcher back after panel closes', launcher.hidden === false)
+  check('no corner launcher is injected', !host?.shadowRoot?.querySelector('.apweb-launch'))
+  check('the floating panel starts hidden', host.shadowRoot.querySelector('.apweb-panel').hidden === true)
 
   const paragraph = new El('p')
   paragraph.innerText = 'A short paragraph that contains the target word and a bit more text around it.'
@@ -611,7 +607,8 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   const selectionTurn = AIStore.state.messages.slice(beforeSelection)
   check('pill click asked about the selection', selectionTurn[0]?.content === 'serendipity')
   check('pill click opens the panel', host.shadowRoot.querySelector('.apweb-panel').hidden === false)
-  check('opening the panel is remembered', AIStore.state.settings.panelOpen === true)
+  // Open state lives per tab in the background, not in the shared settings.
+  check('opening the panel is recorded for this tab', tabPanelOpen === true)
   check('selection turn answered', selectionTurn[1]?.content === '你好，世界')
   check(
     'short selection attached the paragraph as context',
@@ -662,80 +659,20 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   check('panel blocks bubble-phase listeners on window', bubbleSaw === false)
   check('capture-phase listener on window still fires', captureSaw === true)
 
-  // Leaving the in-page panel open would leave *it* owning the page reflow and
-  // mask the single-panel behaviour the dock checks are about.
-  host.shadowRoot
-    .querySelectorAll('button')
-    .find((b) => b.textContent === '✕')
-    .dispatch('click', {})
+  console.log('sidebar takes over')
+  check('the floating panel is still open', host.shadowRoot.querySelector('.apweb-panel').hidden === false)
+  dispatchToContent({ t: 'apweb:sidebar-opened' })
   await tick()
-  check('closing the in-page panel is remembered', AIStore.state.settings.panelOpen === false)
-  const fresh = AIPanel.createPanel({ startOpen: AIStore.state.settings.panelOpen })
-  check('a new page starts closed when that was the last state', fresh.isOpen() === false)
-  fresh.destroy()
-  AIStore.updateSettings({ panelOpen: true })
-  const fresh2 = AIPanel.createPanel({ startOpen: AIStore.state.settings.panelOpen })
-  check('a new page reopens when that was the last state', fresh2.isOpen() === true)
-  fresh2.destroy()
-  AIStore.updateSettings({ panelOpen: false })
+  check('opening the sidebar closes the floating panel', host.shadowRoot.querySelector('.apweb-panel').hidden === true)
+  check('and that closure is recorded for the tab', tabPanelOpen === false)
 
-  console.log('docked layout')
-  const dockPanel = panel.el.querySelector('.apweb-panel')
-  const dockHandle = panel.el.querySelector('.apweb-dock-handle')
-  panel.setOpen(true)
-  check('dock grip starts hidden', dockHandle.hidden === true)
-  AIStore.updateSettings({ panelMode: 'right', dockWidth: 420 })
-  await tick()
-  check('scope marked as docked', panel.el.classList.contains('apweb-scope--dock'))
-  check('docked to the right', panel.el.classList.contains('apweb-scope--dock-right'))
-  check('docked width applied', dockPanel.style.width === '420px')
-  check('dock grip visible', dockHandle.hidden === false)
-  check('page reserves the panel width + scrollbar', document.documentElement.style.marginRight === '435px')
-  check('panel leaves the scrollbar visible', dockPanel.style.right === '15px')
-  check('page horizontal overflow clipped while docked', document.documentElement.style.overflowX === 'hidden')
-
-  // Drag the inner edge: for a right dock the width is the distance from the
-  // panel's right edge back to the pointer.
-  dockHandle.dispatch('pointerdown', { button: 0, pointerId: 3, clientX: 60, target: dockHandle })
-  dockHandle.dispatch('pointermove', { pointerId: 3, clientX: 0 })
-  check('resize clamps to the minimum width', dockPanel.style.width === `${AICore.DOCK_MIN_WIDTH}px`)
-  check('page follows the live resize', document.documentElement.style.marginRight === '335px')
-  dockHandle.dispatch('pointerup', { pointerId: 3 })
-  check('resize persists the width', AIStore.state.settings.dockWidth === AICore.DOCK_MIN_WIDTH)
-
-  AIStore.updateSettings({ panelMode: 'left' })
-  check('docks to the left', panel.el.classList.contains('apweb-scope--dock-left'))
-  check('left dock reserves on the left edge', document.documentElement.style.marginLeft === '335px')
-  check('left dock keeps the scrollbar visible', dockPanel.style.left === '15px')
-  AIStore.updateSettings({ panelMode: 'floating' })
-  check('floating mode restored', !panel.el.classList.contains('apweb-scope--dock'))
-  check('inline width cleared when floating', dockPanel.style.width === '')
-  check('dock grip hidden again', dockHandle.hidden === true)
-  check('page gets its space back', document.documentElement.style.marginRight === '')
-  check('page overflow restored', document.documentElement.style.overflowX === '')
-
-  // Closed docked panel: the page must not keep paying for the reserved strip.
-  AIStore.updateSettings({ panelMode: 'right' })
-  check('docked + open reserves space again', document.documentElement.style.marginRight === '335px')
-  panel.setOpen(false)
-  check('closing a docked panel releases the space', document.documentElement.style.marginRight === '')
-  AIStore.updateSettings({ panelMode: 'floating' })
-
-  console.log('page zoom compensation')
-  panel.setOpen(true)
-  AIStore.updateSettings({ panelMode: 'right' })
-  panel.setPageZoom(2)
-  check('panel counter-scales against the zoom', dockPanel.style.transform === 'scale(0.5)')
-  check('panel stays anchored to its edge', dockPanel.style.transformOrigin === 'top right')
-  check('docked box stretches to stay full height', dockPanel.style.height === '1600px')
-  check('docked width is a constant on-screen width', dockPanel.style.width === '320px')
-  check('page reserve divides the zoom back out', document.documentElement.style.marginRight === '175px')
-  panel.setPageZoom(1)
-  check('zoom reset clears the transform', dockPanel.style.transform === '')
-  check('full-height override cleared at 100%', dockPanel.style.height === '')
-  check('page reserve back to 1:1', document.documentElement.style.marginRight === '335px')
-  AIStore.updateSettings({ panelMode: 'floating' })
-  panel.setOpen(false)
+  console.log('per-tab panel state')
+  // A fresh content script (i.e. a new page in this tab) reads the state back.
+  tabPanelOpen = true
+  const reopened = AIPanel.createPanel({ startOpen: tabPanelOpen })
+  check('a new page in the same tab restores the state', reopened.isOpen() === true)
+  reopened.destroy()
+  tabPanelOpen = false
 
   console.log('cross-surface sync')
   remoteWrite('apweb.ai.messages', [{ role: 'assistant', content: '来自侧栏' }])

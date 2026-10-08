@@ -25,7 +25,6 @@
         if (value === undefined) continue
         if (key === 'class') el.className = value
         else if (key === 'text') el.textContent = value
-        else if (key === 'html') el.innerHTML = value
         else if (key === 'style' && typeof value !== 'string') Object.assign(el.style, value)
         else if (key === 'on') {
           for (const ev of Object.keys(value)) el.addEventListener(ev, value[ev])
@@ -160,40 +159,6 @@
     return error
   }
 
-  /* ------------------------------ page reflow -------------------------------- */
-
-  // Space reserved on the page while a panel is docked. Kept per document, not
-  // per panel, so two panels in one document (as the test harness builds) share
-  // one snapshot instead of overwriting each other's restoration.
-  const REFLOW_PROPS = ['marginRight', 'marginLeft', 'overflowX']
-  const reflowRecords = new WeakMap()
-
-  function beginReflow(el) {
-    const existing = reflowRecords.get(el)
-    if (existing) {
-      existing.owners += 1
-      return existing
-    }
-    const record = { owners: 1, snapshot: {} }
-    for (const prop of REFLOW_PROPS) record.snapshot[prop] = el.style[prop]
-    // Measured before anything is reserved: afterwards our own margin would be
-    // counted as part of the scrollbar.
-    const value = window.innerWidth - el.clientWidth
-    record.scrollbar = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0
-    reflowRecords.set(el, record)
-    return record
-  }
-
-  function endReflow(el) {
-    const record = reflowRecords.get(el)
-    if (!record) return
-    record.owners -= 1
-    // Someone else is still reserving space — only the last one out restores.
-    if (record.owners > 0) return
-    for (const prop of REFLOW_PROPS) el.style[prop] = record.snapshot[prop]
-    reflowRecords.delete(el)
-  }
-
   /* --------------------------------- the panel ------------------------------- */
 
   function createPanel(options) {
@@ -220,16 +185,6 @@
     // The prompt editors start folded away; the state is remembered so a
     // settings re-render (switching a prompt, adding one…) doesn't slam it shut.
     let promptsOpen = false
-    // Which layout ('floating' | 'right' | 'left') is currently applied.
-    let appliedMode = null
-    // Page zoom (1 = 100%). The panel is drawn by the page, so it inherits the
-    // page's zoom; it counter-scales itself to keep a constant on-screen size.
-    // Widths that mean "pixels on screen" — the dock width, and what the page
-    // reserves — are therefore device pixels, divided by the zoom wherever a
-    // page-space length is needed.
-    let pageZoom = 1
-    // Whether this panel is currently counted as an owner of the page reflow.
-    let holdsReflow = false
     const refs = {}
 
     /* -------------------------------- structure ------------------------------- */
@@ -259,14 +214,22 @@
       on: { click: () => setOpen(false) },
     })
 
-    const head = h('header', { class: 'apweb-panel__head' }, [
-      h('div', { class: 'apweb-title' }, [refs.dot, h('strong', { text: 'AI 助手' }), refs.model]),
+    // The browser sidebar already says what it is and is closed by the browser's
+    // own control, so it keeps only the actions (todo: no title / no ✕ there).
+    const head = h(
+      'header',
+      { class: `apweb-panel__head${opts.hideTitle ? ' apweb-panel__head--titleless' : ''}` },
+      [
+      opts.hideTitle
+        ? null
+        : h('div', { class: 'apweb-title' }, [refs.dot, h('strong', { text: 'AI 助手' }), refs.model]),
       h('div', { class: 'apweb-head-actions' }, [
         refs.settingsBtn,
         refs.clearBtn,
-        embed || opts.hideClose ? null : closeBtn,
+        embed || opts.hideClose || opts.hideTitle ? null : closeBtn,
       ]),
-    ])
+      ],
+    )
 
     refs.settingsEl = h('div', { class: 'apweb-settings', hidden: true })
     refs.msgs = h('div', { class: 'apweb-msgs' })
@@ -311,25 +274,9 @@
     ])
     if (!open) refs.panel.hidden = true
 
-    // In the docked layout the panel sits flush against an edge and needs its own
-    // grip on the inner edge: CSS `resize` only ever draws one at the
-    // bottom-right corner, which is useless for a panel docked to the right.
-    refs.dockHandle = h('div', {
-      class: 'apweb-dock-handle',
-      hidden: true,
-      title: '拖动调整宽度，双击复位',
-      'data-field': 'dock-handle',
-      on: { dblclick: () => setDockWidth(AICore.DEFAULT_SETTINGS.dockWidth) },
-    })
-    refs.panel.appendChild(refs.dockHandle)
-
     scope.appendChild(refs.panel)
     isolate(scope)
-    if (!embed) {
-      enableDrag(head, refs.panel)
-      enableDockResize(refs.dockHandle, refs.panel)
-    }
-    applyLayout()
+    if (!embed) enableDrag(head, refs.panel)
 
     /* --------------------------------- helpers -------------------------------- */
 
@@ -337,8 +284,6 @@
       open = Boolean(next)
       refs.panel.hidden = !open
       opts.onOpenChange?.(open)
-      // Docking reserves page space only while the panel is on screen.
-      applyLayout()
       if (open) {
         syncHeader()
         if (showSettings) renderSettings()
@@ -363,211 +308,6 @@
 
     function toggle() {
       setOpen(!open)
-    }
-
-    /** 'right' | 'left' when the panel is docked, otherwise null. */
-    function modeSide() {
-      const mode = S().panelMode
-      return mode === 'right' || mode === 'left' ? mode : null
-    }
-
-    /** Which edge the panel is anchored to — decides the zoom scaling origin. */
-    function panelAnchor() {
-      const side = modeSide()
-      if (side) return side
-      // A floating panel is anchored right until it has been dragged somewhere.
-      return refs.panel.style.left ? 'left' : 'right'
-    }
-
-    /** Width the dock is clamped against, in device pixels. */
-    function deviceViewportWidth() {
-      return window.innerWidth * pageZoom
-    }
-
-    function setPageZoom(zoom) {
-      const value = Number(zoom)
-      pageZoom = Number.isFinite(value) && value > 0 ? value : 1
-      applyLayout()
-    }
-
-    /**
-     * Counter-scale so a page zoom of 200% does not make the panel look twice as
-     * big. Anchoring the origin on the panel's own edge keeps the dock flush and
-     * keeps a dragged floating panel where it was put.
-     */
-    function applyZoom() {
-      if (embed) return
-      const scale = 1 / pageZoom
-      refs.panel.style.transformOrigin = panelAnchor() === 'left' ? 'top left' : 'top right'
-      refs.panel.style.transform = scale === 1 ? '' : `scale(${scale})`
-    }
-
-    function setDockWidth(width) {
-      const clamped = AICore.clampDockWidth(width, deviceViewportWidth())
-      refs.panel.style.width = `${clamped}px`
-      update({ dockWidth: clamped })
-      return clamped
-    }
-
-    /**
-     * Apply the docked/floating layout. Only a *change* of mode resets the
-     * inline position, so a panel the user dragged stays where they put it while
-     * unrelated settings change.
-     */
-    function applyLayout() {
-      if (embed) return
-      const side = modeSide()
-      const mode = side ?? 'floating'
-      const changed = mode !== appliedMode
-      appliedMode = mode
-
-      scope.classList.toggle('apweb-scope--dock', Boolean(side))
-      scope.classList.toggle('apweb-scope--dock-right', side === 'right')
-      scope.classList.toggle('apweb-scope--dock-left', side === 'left')
-      refs.dockHandle.hidden = !side
-
-      if (side) {
-        if (changed) {
-          // Docking wins over wherever the panel was dragged to while floating.
-          refs.panel.style.left = ''
-          refs.panel.style.top = ''
-          refs.panel.style.right = ''
-        }
-        const width = AICore.clampDockWidth(S().dockWidth, deviceViewportWidth())
-        refs.panel.style.width = `${width}px`
-        // Full height means "full height on screen": the box is drawn in page
-        // pixels first, so at a zoom of 200% it must be laid out twice as tall to
-        // end up covering the viewport after the counter-scale below.
-        refs.panel.style.height =
-          pageZoom === 1 ? '' : `${Math.round(window.innerHeight * pageZoom)}px`
-        // Reflow only while the panel is actually on screen — closing it gives
-        // the page its space back.
-        if (open) applyReflow(side, width)
-        else clearReflow()
-      } else if (changed) {
-        clearReflow()
-        refs.panel.style.width = ''
-        refs.panel.style.height = ''
-        refs.panel.style.left = ''
-        refs.panel.style.top = ''
-        refs.panel.style.right = ''
-      }
-      applyZoom()
-    }
-
-    /**
-     * Reserve the panel's width on the page. The panel itself stays `fixed`, so
-     * a page's `position: fixed` chrome still spans the whole window — that is
-     * the one thing a generic in-page dock cannot reshape (the native sidebar
-     * gets it right because the browser resizes the content area).
-     *
-     * The panel is nudged inwards by the scrollbar width so the page's own
-     * scrollbar stays visible in the strip beside it, and the reserved margin
-     * covers both. Without that the scrollbar would sit underneath the panel and
-     * become unreachable.
-     */
-    function applyReflow(side, width) {
-      const el = document.documentElement
-      if (!el || !side) return
-      if (!holdsReflow) {
-        holdsReflow = true
-        beginReflow(el)
-      }
-      const record = reflowRecords.get(el)
-      if (!record) return
-
-      // `width` is a device-pixel width; the page's margin is in its own (zoomed)
-      // pixels, so it has to be divided back out.
-      const reserve = width / pageZoom + record.scrollbar
-      // Full-bleed sections sized with `100vw` would otherwise stick out into the
-      // reserved strip and add a horizontal scrollbar.
-      el.style.overflowX = 'hidden'
-      if (side === 'right') {
-        el.style.marginRight = `${reserve}px`
-        el.style.marginLeft = record.snapshot.marginLeft
-      } else {
-        el.style.marginLeft = `${reserve}px`
-        el.style.marginRight = record.snapshot.marginRight
-      }
-
-      refs.panel.style.right = side === 'right' ? `${record.scrollbar}px` : ''
-      refs.panel.style.left = side === 'left' ? `${record.scrollbar}px` : ''
-    }
-
-    function clearReflow() {
-      if (holdsReflow) {
-        holdsReflow = false
-        const el = document.documentElement
-        if (el) endReflow(el)
-      }
-      refs.panel.style.left = ''
-      refs.panel.style.right = ''
-    }
-
-    /**
-     * Drag the inner edge of a docked panel to resize it. Same capture-phase
-     * listener trick as the header drag: the panel stops pointer events from
-     * reaching the page, so a bubble-phase listener on `window` would never see
-     * the release.
-     */
-    function enableDockResize(handle, panel) {
-      let resizing = false
-      let pointerId = null
-      let side = null
-      let width = 0
-
-      const onMove = (event) => {
-        if (!resizing) return
-        if (pointerId !== null && event.pointerId !== undefined && event.pointerId !== pointerId) return
-        // getBoundingClientRect() is the *rendered* box; multiply back by the zoom
-        // to get the width in device pixels, which is what the setting stores.
-        const rect = panel.getBoundingClientRect()
-        const raw = (side === 'right' ? rect.right - event.clientX : event.clientX - rect.left) * pageZoom
-        width = AICore.clampDockWidth(raw, deviceViewportWidth())
-        panel.style.width = `${width}px`
-        // The page has to give up (or take back) space as the edge moves.
-        applyReflow(side, width)
-      }
-
-      const endResize = (event) => {
-        if (!resizing) return
-        if (event && pointerId !== null && event.pointerId !== undefined && event.pointerId !== pointerId) {
-          return
-        }
-        const id = pointerId
-        resizing = false
-        pointerId = null
-        window.removeEventListener('pointermove', onMove, true)
-        window.removeEventListener('pointerup', endResize, true)
-        window.removeEventListener('pointercancel', endResize, true)
-        window.removeEventListener('blur', endResize, true)
-        try {
-          if (id !== null) handle.releasePointerCapture?.(id)
-        } catch {
-          // already released
-        }
-        if (width) update({ dockWidth: width })
-      }
-
-      handle.addEventListener('pointerdown', (event) => {
-        if (event.button !== 0) return
-        side = modeSide()
-        if (!side) return
-        resizing = true
-        pointerId = event.pointerId ?? null
-        width = panel.getBoundingClientRect().width * pageZoom
-        event.preventDefault()
-        event.stopPropagation()
-        try {
-          if (event.pointerId !== undefined) handle.setPointerCapture?.(event.pointerId)
-        } catch {
-          // capture is optional; the window listeners keep the resize alive
-        }
-        window.addEventListener('pointermove', onMove, true)
-        window.addEventListener('pointerup', endResize, true)
-        window.addEventListener('pointercancel', endResize, true)
-        window.addEventListener('blur', endResize, true)
-      })
     }
 
     function syncHeader() {
@@ -1163,43 +903,6 @@
           ),
         ),
       )
-      refs.settingsEl.appendChild(
-        h('label', { class: 'apweb-check' }, [
-          h('input', {
-            type: 'checkbox',
-            checked: settings.showLauncher,
-            'data-field': 'show-launcher',
-            on: { change: (event) => update({ showLauncher: event.target.checked }) },
-          }),
-          h('span', { text: '在页面右下角显示「划词即问」快捷按钮' }),
-        ]),
-      )
-
-      // Display mode -----------------------------------------------------------
-      refs.settingsEl.appendChild(
-        field(
-          '面板显示方式',
-          selectControl(
-            [
-              { value: 'floating', label: '浮动卡片（可拖动）' },
-              { value: 'right', label: '固定在右侧（占满高度）' },
-              { value: 'left', label: '固定在左侧（占满高度）' },
-            ],
-            settings.panelMode,
-            (value) => {
-              update({ panelMode: value })
-              applyLayout()
-            },
-            { 'data-field': 'panel-mode' },
-          ),
-          h('span', {
-            class: 'apweb-hint-inline',
-            text:
-              `固定后拖动贴着页面的那条边可调宽度（最窄 ${AICore.DOCK_MIN_WIDTH}px），双击复位。` +
-              '想要真正「占位」的侧栏，用浏览器自带的「AI 助手」侧栏（视图 → 侧栏）。',
-          }),
-        ),
-      )
 
       // Prompt libraries -------------------------------------------------------
       refs.settingsEl.appendChild(buildPrompts())
@@ -1419,8 +1122,6 @@
       handle.addEventListener('pointerdown', (event) => {
         if (event.button !== 0) return
         if (event.target.closest('button')) return
-        // A docked panel is pinned to its edge; there is nothing to drag.
-        if (modeSide()) return
         const rect = panel.getBoundingClientRect()
         dragging = true
         pointerId = event.pointerId ?? null
@@ -1447,21 +1148,14 @@
       syncHeader()
       refreshModeControl()
       syncComposer()
-      applyLayout()
       // A change that came from another surface (sidebar / options / another
       // tab) has to be reflected in the transcript too.
       if (meta?.remote) renderMessages()
     })
 
-    // The docked width is clamped against the viewport, so a window resize has to
-    // re-run the layout and the reflow.
-    const onWindowResize = () => applyLayout()
-    if (!embed) window.addEventListener('resize', onWindowResize)
-
     renderMessages()
     syncHeader()
     syncComposer()
-    applyLayout()
     if (showSettings) renderSettings()
 
     return {
@@ -1472,18 +1166,13 @@
       askSelection,
       setSelectionAuto,
       buildSelectionContext,
-      setPageZoom,
-      getPageZoom: () => pageZoom,
       isSelectionAuto: () => S().selectionTrigger === 'auto',
-      refreshLayout: applyLayout,
       openSettings: () => setShowSettings(true),
       focusComposer: () => refs.input.focus({ preventScroll: true }),
       destroy: () => {
         controller?.abort()
         window.clearTimeout(scrollTimer)
         if (frame) window.cancelAnimationFrame(frame)
-        if (!embed) window.removeEventListener('resize', onWindowResize)
-        clearReflow()
         unsubscribe()
       },
     }
