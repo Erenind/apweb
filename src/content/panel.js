@@ -168,6 +168,8 @@
   const MIN_PANEL_HEIGHT = 240
   const PANEL_MARGIN = 8
   const PANEL_HEAD_KEEP = 60
+  /** Must match the height transition on `.apweb-composer__body`. */
+  const COMPOSER_ANIM_MS = 200
 
   function clampPanelRect(rect, viewport) {
     const maxWidth = Math.max(MIN_PANEL_WIDTH, viewport.width - PANEL_MARGIN * 2)
@@ -210,6 +212,10 @@
     // The prompt editors start folded away; the state is remembered so a
     // settings re-render (switching a prompt, adding one…) doesn't slam it shut.
     let promptsOpen = false
+    // Last fold state applied to the composer, so repeated store updates do not
+    // restart the animation.
+    let composerApplied = null
+    let composerAnimTimer = null
     const refs = {}
 
     /* -------------------------------- structure ------------------------------- */
@@ -280,7 +286,22 @@
       on: { click: () => stop() },
     })
 
-    const composer = h('div', { class: 'apweb-composer' }, [refs.input, refs.stopBtn, refs.sendBtn])
+    // The composer folds away: reading a long answer should not be cramped by an
+    // input box nobody is typing in. The fold state is remembered.
+    // The fold arrow floats just outside the composer's top-left corner; the
+    // padding lives on an inner row so a body height of 0 really means 0.
+    refs.composerToggle = h('button', {
+      type: 'button',
+      class: 'apweb-composer__toggle',
+      'data-field': 'composer-toggle',
+      title: '收起输入框',
+      on: { click: () => setComposerOpen(!isComposerOpen()) },
+    }, [h('span', { class: 'apweb-composer__chevron' })])
+    refs.composerBody = h('div', { class: 'apweb-composer__body' }, [
+      h('div', { class: 'apweb-composer__inner' }, [refs.input, refs.stopBtn, refs.sendBtn]),
+    ])
+    refs.composer = h('div', { class: 'apweb-composer' }, [refs.composerToggle, refs.composerBody])
+    const composer = refs.composer
 
     refs.panel = h('section', { class: 'apweb-panel' }, [
       head,
@@ -338,9 +359,12 @@
       refs.settingsEl.hidden = !showSettings
       if (showSettings) renderSettings()
       else {
-        // The mode control lives inside the form; drop the refs along with it.
+        // These controls live inside the form; drop the refs along with it.
         refs.modeBtn = null
         refs.modeHint = null
+        refs.triggerSelect = null
+        refs.actionSelect = null
+        refs.actionHint = null
       }
       syncComposer()
     }
@@ -492,6 +516,38 @@
       refreshModeControl()
     }
 
+    /**
+     * Keep the two 划词 selects in step with the settings no matter who changed
+     * them. The prominent toggle at the top of the form edits the same
+     * `selectionTrigger` as the first select, so clicking it has to move that
+     * select too — otherwise the form below only catches up when it happens to be
+     * rebuilt, which reads as two controls disagreeing. Refreshing the values in
+     * place (instead of re-rendering) also keeps focus in the text fields.
+     */
+    function refreshSelectionFields() {
+      const settings = S()
+      const trigger = settings.selectionTrigger
+
+      if (refs.triggerSelect && refs.triggerSelect.value !== trigger) {
+        refs.triggerSelect.value = trigger
+      }
+
+      if (refs.actionSelect) {
+        const action = AICore.findPrompt(settings.selectionPrompts, settings.selectionAction)?.id ?? ''
+        if (refs.actionSelect.value !== action) refs.actionSelect.value = action
+        // Nothing to pick while 划词提问 is off; a live-looking control that does
+        // nothing is exactly what confuses people.
+        refs.actionSelect.disabled = trigger === 'off'
+      }
+
+      if (refs.actionHint) {
+        refs.actionHint.textContent =
+          trigger === 'off'
+            ? '划词提问现在是关闭的；选好用途后，把上面那项打开才会生效。'
+            : '选中文字后要做什么；「划词提问」一打开就按这里选的方式处理。'
+      }
+    }
+
     function syncComposer() {
       refs.sendBtn.hidden = streaming
       refs.stopBtn.hidden = !streaming
@@ -500,6 +556,65 @@
       // back to a focused <textarea> would jump the caret to the end.
       if (refs.input.value !== draftText) refs.input.value = draftText
       refs.input.disabled = !S().apiKey && showSettings
+
+      const open = isComposerOpen()
+      // Only touch the fold when the state actually changed: otherwise a store
+      // update mid-animation would snap the height and kill the transition.
+      if (open !== composerApplied) {
+        const animate = composerApplied !== null
+        composerApplied = open
+        applyComposer(open, animate)
+      }
+    }
+
+    const isComposerOpen = () => S().composerOpen !== false
+
+    /**
+     * Fold or unfold the composer.
+     *
+     * `height: auto` cannot be interpolated, so the animation is driven with an
+     * explicit pixel height: measure the natural height, animate to it (or to 0),
+     * then hand the height back to `auto` once the transition is over so the row
+     * can still grow with its content.
+     */
+    function applyComposer(open, animate) {
+      refs.composer.classList.toggle('apweb-composer--collapsed', !open)
+      refs.composerToggle.title = open ? '收起输入框' : '展开输入框'
+      refs.composerToggle.setAttribute('aria-expanded', String(open))
+      // A clipped input must not stay in the tab order.
+      for (const el of [refs.input, refs.sendBtn, refs.stopBtn]) {
+        el.tabIndex = open ? 0 : -1
+      }
+
+      window.clearTimeout(composerAnimTimer)
+      composerAnimTimer = null
+
+      if (!animate) {
+        refs.composerBody.style.height = open ? '' : '0px'
+        return
+      }
+
+      const body = refs.composerBody
+      const from = Math.round(body.getBoundingClientRect().height)
+      body.style.height = `${from}px`
+      // Flush layout so the browser animates from the height we just pinned.
+      void body.offsetHeight
+
+      if (!open) {
+        body.style.height = '0px'
+        return
+      }
+
+      body.style.height = `${body.scrollHeight}px`
+      composerAnimTimer = window.setTimeout(() => {
+        composerAnimTimer = null
+        body.style.height = ''
+      }, COMPOSER_ANIM_MS)
+    }
+
+    function setComposerOpen(open) {
+      update({ composerOpen: open })
+      if (open && !embed) refs.input.focus({ preventScroll: true })
     }
 
     function canSend() {
@@ -1014,39 +1129,40 @@
       refreshThinking()
 
       // Selection behaviour ----------------------------------------------------
+      // These two selects mirror the same settings the prominent toggle above
+      // edits, so they are refreshed in place (see refreshSelectionFields) rather
+      // than only when this form is rebuilt.
+      refs.triggerSelect = selectControl(
+        [
+          { value: 'off', label: '关闭（只选中，不发送）' },
+          { value: 'click', label: '选中后显示按钮，点击提问' },
+          { value: 'auto', label: '选中后自动提问' },
+        ],
+        settings.selectionTrigger,
+        (value) => update({ selectionTrigger: value }),
+        { 'data-field': 'selection-trigger' },
+      )
       refs.settingsEl.appendChild(
         field(
           '划词提问',
-          selectControl(
-            [
-              { value: 'off', label: '关闭（只选中，不发送）' },
-              { value: 'click', label: '选中后显示按钮，点击提问' },
-              { value: 'auto', label: '选中后自动提问' },
-            ],
-            settings.selectionTrigger,
-            (value) => update({ selectionTrigger: value }),
-            { 'data-field': 'selection-trigger' },
-          ),
+          refs.triggerSelect,
           h('span', {
             class: 'apweb-hint-inline',
             text: '自动提问会在每次划选后立刻产生一次 API 调用；只想复制文字就用「关闭」。',
           }),
         ),
       )
-      refs.settingsEl.appendChild(
-        field(
-          '划词用途',
-          selectControl(
-            settings.selectionPrompts.map((item) => ({ value: item.id, label: item.name })),
-            AICore.findPrompt(settings.selectionPrompts, settings.selectionAction)?.id ?? '',
-            (value) => {
-              update({ selectionAction: value })
-              renderSettings()
-            },
-            { 'data-field': 'selection-action' },
-          ),
-        ),
+      refs.actionSelect = selectControl(
+        settings.selectionPrompts.map((item) => ({ value: item.id, label: item.name })),
+        AICore.findPrompt(settings.selectionPrompts, settings.selectionAction)?.id ?? '',
+        (value) => update({ selectionAction: value }),
+        { 'data-field': 'selection-action' },
       )
+      refs.actionHint = h('span', { class: 'apweb-hint-inline' })
+      refs.settingsEl.appendChild(
+        field('划词用途', refs.actionSelect, refs.actionHint),
+      )
+      refreshSelectionFields()
 
       // Prompt libraries -------------------------------------------------------
       refs.settingsEl.appendChild(buildPrompts())
@@ -1296,6 +1412,7 @@
     const unsubscribe = AIStore.subscribe((_state, meta) => {
       syncHeader()
       refreshModeControl()
+      refreshSelectionFields()
       syncComposer()
       // A change that came from another surface (options page / another tab) has
       // to be reflected in the transcript too.

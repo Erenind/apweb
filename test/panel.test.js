@@ -458,6 +458,39 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   console.log('first-run defaults')
   check('there is no panel display-mode setting', !('panelMode' in AIStore.state.settings))
   check('the floating panel starts closed', tabPanelOpen === false)
+  // `rem` resolves against the page's <html> font size, not our own 15px, so a
+  // page using the 62.5% trick would shrink the whole panel. Keep it in px.
+  const panelCss = fs.readFileSync(`${ROOT}/src/content/panel.css`, 'utf8')
+  // Comments discuss these values by name, so match against the declarations only.
+  const panelRules = panelCss.replace(/\/\*[\s\S]*?\*\//g, '')
+  check('panel styles use absolute px, never rem', !/\d\s*rem\b/.test(panelRules))
+  // U+2303/U+2304 are missing from plenty of fonts, which made the fold arrow
+  // disappear; it is drawn from borders instead.
+  const panelJs = fs.readFileSync(`${ROOT}/src/content/panel.js`, 'utf8')
+  check('the fold arrow is CSS-drawn, not a glyph', !/[\u2303\u2304]/.test(panelJs))
+  // Specificity trap: `.apweb-composer button` (0,1,1) also matches the fold
+  // toggle and beats `.apweb-composer__toggle` (0,1,0), which forced the notch to
+  // 54.4x36.8px — a big patch over the transcript with its arrow clipped away.
+  check('no bare `.apweb-composer button` rule', !/\.apweb-composer\s+button\b/.test(panelRules))
+  // The exact pixels are hand-tuned, so assert the shape of the layout instead:
+  // the notch sits just above the composer's top edge (the old 54.4x36.8 bug put
+  // its bottom ~25px inside), and when folded it is fully above that edge, where
+  // the panel's rounded corner cannot clip it away.
+  const toggleRule = panelRules.match(/\.apweb-composer__toggle\s*\{([^}]*)\}/)?.[1] ?? ''
+  const toggleTop = parseFloat(toggleRule.match(/top:\s*(-?[\d.]+)px/)?.[1])
+  const toggleHeight = parseFloat(toggleRule.match(/height:\s*([\d.]+)px/)?.[1])
+  const toggleBottom = toggleTop + toggleHeight
+  check(
+    'the notch hugs the composer top edge',
+    Number.isFinite(toggleBottom) && toggleBottom >= -8 && toggleBottom <= 2,
+  )
+  const collapsedToggleRule =
+    panelRules.match(/\.apweb-composer--collapsed\s+\.apweb-composer__toggle\s*\{([^}]*)\}/)?.[1] ?? ''
+  const collapsedTop = parseFloat(collapsedToggleRule.match(/top:\s*(-?[\d.]+)px/)?.[1])
+  check(
+    'the folded notch stays fully above the composer edge',
+    Number.isFinite(collapsedTop) && collapsedTop + toggleHeight <= 0,
+  )
   AIStore.updateSettings({ providerId: 'deepseek', model: 'deepseek-flash', apiKey: 'sk-test' })
 
   console.log('panel construction')
@@ -519,7 +552,46 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   check('toggle switches back to click mode', AIStore.state.settings.selectionTrigger === 'click')
   check('toggle label resets', modeBtn.textContent.includes('启动划词即问'))
 
+  // The toggle edits the same setting as the 划词提问 select right below it, so the
+  // form must follow immediately instead of only after it is rebuilt.
+  const triggerSelectEl = settingsEl
+    .querySelectorAll('select')
+    .find((s) => s.getAttribute('data-field') === 'selection-trigger')
+  const actionSelectEl = settingsEl
+    .querySelectorAll('select')
+    .find((s) => s.getAttribute('data-field') === 'selection-action')
+  check('the 划词提问 select starts on click', triggerSelectEl.value === 'click')
+  modeBtn.dispatch('click', {})
+  check('the toggle moves the 划词提问 select to auto', triggerSelectEl.value === 'auto')
+  check('划词用途 stays enabled while 划词提问 is on', actionSelectEl.disabled === false)
+  AIStore.updateSettings({ selectionTrigger: 'off' })
+  check('closing 划词提问 moves the select to off', triggerSelectEl.value === 'off')
+  check('and greys out 划词用途', actionSelectEl.disabled === true)
+  AIStore.updateSettings({ selectionTrigger: 'click' })
+  check('reopening re-enables 划词用途', actionSelectEl.disabled === false)
+  check('the select follows that too', triggerSelectEl.value === 'click')
+
   console.log('streamed composer turn')
+  const composerBody = panel.el.querySelector('.apweb-composer__body')
+  const composerRow = panel.el.querySelector('.apweb-composer')
+  const composerToggle = panel.el.querySelector('.apweb-composer__toggle')
+  check('composer has a fold toggle', !!composerToggle)
+  check('composer starts unfolded', !composerRow.classList.contains('apweb-composer--collapsed'))
+  check('unfolded body has no pinned height', composerBody.style.height === '')
+  composerToggle.dispatch('click', {})
+  check('folding collapses the body to zero height', composerBody.style.height === '0px')
+  check('folding marks the composer collapsed', composerRow.classList.contains('apweb-composer--collapsed'))
+  check('the chevron is CSS-drawn', !!composerToggle.querySelector('.apweb-composer__chevron'))
+  check('the arrow flips up', composerToggle.getAttribute('aria-expanded') === 'false')
+  check('the clipped input leaves the tab order', composerBody.querySelectorAll('textarea')[0].tabIndex === -1)
+  check('the folded state is saved', AIStore.state.settings.composerOpen === false)
+  composerToggle.dispatch('click', {})
+  check('unfolding animates to the natural height', composerBody.style.height === '100px')
+  await new Promise((r) => setTimeout(r, 260))
+  check('then hands the height back to auto', composerBody.style.height === '')
+  check('the arrow points down again', composerToggle.getAttribute('aria-expanded') === 'true')
+  check('the unfolded state is saved', AIStore.state.settings.composerOpen === true)
+
   const textarea = panel.el.querySelector('.apweb-composer').querySelectorAll('textarea')[0]
   check('composer textarea present', !!textarea)
   textarea.value = '这是什么？'

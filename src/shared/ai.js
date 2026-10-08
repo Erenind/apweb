@@ -53,6 +53,8 @@
     // { left, top, width, height }. null until the panel is first moved or
     // resized, so a fresh install uses the default top-right card.
     panelRect: null,
+    // Whether the composer (input + send) is unfolded.
+    composerOpen: true,
     // DeepSeek's own default is thinking on, but that makes every question wait
     // for a reasoning pass; a reading assistant wants quick answers.
     thinking: false,
