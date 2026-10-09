@@ -10,7 +10,7 @@
   'use strict'
 
   const PROVIDERS = [
-    { id: 'openai', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+    { id: 'openai', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-6-astra' },
     {
       id: 'deepseek',
       label: 'DeepSeek',
@@ -21,8 +21,8 @@
       models: ['deepseek-flash', 'deepseek-v4-pro'],
       supportsThinking: true,
     },
-    { id: 'moonshot', label: 'Moonshot / Kimi', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
-    { id: 'dashscope', label: '通义千问', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
+    { id: 'moonshot', label: 'Moonshot / Kimi', baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k3' },
+    { id: 'dashscope', label: '通义千问', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen3.8-flash' },
     {
       id: 'zhipu',
       label: '智谱 GLM',
@@ -30,7 +30,7 @@
       // GLM-5.2 rather than GLM-5.3 on purpose: 5.3 can no longer disable
       // thinking (the API errors on `disabled`), which is exactly the slowness
       // this setting exists to avoid.
-      model: 'glm-5.2',
+      model: 'glm-4.6',
       models: ['glm-5.2', 'glm-5.3', 'glm-4.6'],
     },
     { id: 'ollama', label: '本地 Ollama', baseUrl: 'http://localhost:11434/v1', model: 'qwen2.5' },
