@@ -67,7 +67,7 @@
     //   'click' | 'auto' | 'off'
     selectionTrigger: 'click',
     // Which of `selectionPrompts` the button/auto-send uses, or 'off'.
-    selectionAction: 'explain-translate',
+    selectionAction: 'explain',
     // Two prompt libraries, one per entry point. Edit them, add your own,
     // switch between them — ids are stable so the current choice survives an
     // edit.
