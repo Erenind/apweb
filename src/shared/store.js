@@ -20,7 +20,9 @@
   // message (`_body`, `_thinking`…) so a streamed reply can be updated in place;
   // DOM nodes are not structured-cloneable, so writing the objects as-is would
   // make browser.storage.local.set reject and silently lose the whole history.
-  const MESSAGE_FIELDS = ['role', 'content', 'forModel', 'context', 'reasoning']
+  // `action` records which 划词用途 asked a selection turn, so the panel can keep
+  // history from a mode you have since switched away from out of the request.
+  const MESSAGE_FIELDS = ['role', 'content', 'forModel', 'context', 'reasoning', 'action']
 
   const { DEFAULT_SETTINGS, apiKeySlot, findPrompt, providerById } = AICore
 

@@ -354,12 +354,15 @@ const sentToBackground = []
 function makePort(name) {
   const port = {
     name,
+    /** Every message the panel sent, so tests can inspect the request. */
+    received: [],
     _msg: [],
     _disc: [],
     onMessage: { addListener: (fn) => port._msg.push(fn) },
     onDisconnect: { addListener: (fn) => port._disc.push(fn) },
     emit: (m) => port._msg.forEach((fn) => fn(m)),
     postMessage(m) {
+      port.received.push(m)
       if (m.t === 'chat') {
         setTimeout(() => {
           port.emit({ t: 'delta', id: m.id, kind: 'content', text: '你好' })
@@ -417,6 +420,15 @@ let tabPanelOpen = false
 
 function dispatchToContent(message) {
   for (const fn of [...contentMessageListeners]) fn(message)
+}
+
+/** The most recent chat request the panel handed to the background. */
+function lastChatRequest() {
+  for (let i = ports.length - 1; i >= 0; i--) {
+    const chat = ports[i].received.find((m) => m?.t === 'chat')
+    if (chat) return chat.request
+  }
+  return null
 }
 
 /** Simulate another surface (options page / another tab) writing storage. */
@@ -692,6 +704,39 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
     'short selection attached the paragraph as context',
     (selectionTurn[0]?.context ?? '').includes('选中处那一段'),
   )
+
+  console.log('switching 划词用途 takes effect')
+  const askWith = async (word) => {
+    const node = new Text(word)
+    paragraph.appendChild(node)
+    range.startContainer = node
+    range.toString = () => word
+    fakeSelection.anchorNode = node
+    fakeSelection.focusNode = node
+    fakeSelection.toString = () => word
+    document.dispatch('mouseup', { target: paragraph, composedPath: () => [paragraph] })
+    await new Promise((r) => setTimeout(r, 420))
+    shadowPill.dispatch('click', { composedPath: () => [shadowPill] })
+    await tick()
+    await tick()
+    return lastChatRequest()
+  }
+
+  check('the turn above ran in the default mode', AIStore.state.settings.selectionAction === 'explain-translate')
+  AIStore.updateSettings({ selectionAction: 'explain' })
+  const explainRequest = await askWith('ubiquitous')
+  const explainPrompt = AICore.findPrompt(AIStore.state.settings.selectionPrompts, 'explain').text
+  check('the newly chosen mode is the system message', explainRequest?.messages?.[0]?.content === explainPrompt)
+  check(
+    'questions asked in the old mode are left out of the request',
+    !explainRequest.messages.some((m) => String(m.content).includes('serendipity')),
+  )
+  const followUp = await askWith('perseverance')
+  check(
+    'questions in the current mode stay in the request',
+    followUp.messages.some((m) => String(m.content).includes('ubiquitous')),
+  )
+  check('and the newest question is last', String(followUp.messages.at(-1).content).includes('perseverance'))
 
   console.log('drag by the header')
   const contentPanel = host.shadowRoot.querySelector('.apweb-panel')

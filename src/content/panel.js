@@ -803,7 +803,7 @@
      * streaming interrupts it, which is what "I selected something else, answer
      * this instead" should feel like.
      */
-    async function runTurn({ userText, promptText, modelText, context }) {
+    async function runTurn({ userText, promptText, modelText, context, action }) {
       if (controller) controller.abort()
       const runId = ++currentRun
 
@@ -811,6 +811,8 @@
       const user = { role: 'user', content: userText, context: contextInfo }
       // What actually goes to the model, when it differs from what we display.
       if (modelText) user.forModel = modelText
+      // Which 划词用途 asked for this turn, so history can be filtered by mode.
+      if (action) user.action = action
       AIStore.pushMessage(user)
       const reply = { role: 'assistant', content: '' }
       AIStore.pushMessage(reply)
@@ -820,14 +822,7 @@
       // The page reference goes *above* the turn it belongs to, so the ask that
       // follows cannot be misread as applying to it.
       if (context) payload.push({ role: 'system', content: context })
-      // Earlier turns are sent without their context blobs, otherwise every
-      // follow-up would repeat the whole page. `forModel` carries the framed
-      // version of a turn (what the reader sees stays short).
-      const history = messages()
-        .slice(0, -1)
-        .slice(-12)
-        .map((message) => ({ role: message.role, content: message.forModel ?? message.content }))
-      payload.push(...history)
+      payload.push(...historyFor(action))
 
       streaming = true
       const localController = new AbortController()
@@ -877,6 +872,37 @@
         AIStore.touchMessages()
         scheduleUpdate(reply)
       }
+    }
+
+    /**
+     * The earlier turns to send as context, newest last.
+     *
+     * A selection turn records which 划词用途 asked it. Once you switch modes those
+     * answers are worse than useless: they are a run of examples that contradict
+     * the new instruction, and the model happily keeps following them ("switched to
+     * 只解释 and it still explains *and* translates"). So turns asked in another
+     * mode are dropped, together with their answers, while turns with no mode (the
+     * composer) and turns in the current mode stay. Earlier turns are sent without
+     * their context blobs, otherwise every follow-up would repeat the whole page;
+     * `forModel` carries the framed version of a turn (the transcript shows the
+     * short one).
+     */
+    function historyFor(action) {
+      // Drop the empty reply this turn just pushed.
+      const list = messages().slice(0, -1)
+      const kept = []
+      for (let i = 0; i < list.length; i++) {
+        const message = list[i]
+        if (message.role === 'user' && action && message.action && message.action !== action) {
+          // Skip the question and the answer that went with it.
+          if (list[i + 1]?.role === 'assistant') i += 1
+          continue
+        }
+        kept.push(message)
+      }
+      return kept
+        .slice(-12)
+        .map((message) => ({ role: message.role, content: message.forModel ?? message.content }))
     }
 
     async function send() {
@@ -933,6 +959,7 @@
         // The transcript shows just the snippet; the model gets the guarded quote.
         modelText: AICore.selectionTurnText(text),
         context,
+        action,
       })
     }
 
