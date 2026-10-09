@@ -225,6 +225,47 @@
   }
 
   /**
+   * Endpoints that only accept one temperature per model. Sending our own default
+   * is a 400 — "invalid temperature: only 0.6 is allowed for this model" — so for
+   * these models the field is left out entirely and the API applies the value it
+   * allows (which, by definition, is the only one it accepts).
+   *
+   *   Moonshot/Kimi  kimi-k3 → 1, kimi-k2.6 → 0.6
+   *   OpenAI         gpt-5 reasoning models only support the default (1)
+   *
+   * Add a regex here when another model turns out to fix its temperature.
+   */
+  const FIXED_TEMPERATURE = {
+    moonshot: /^kimi-(k3|k2\.6)/,
+    openai: /^gpt-5/,
+  }
+
+  /** The fixed-temperature rule for this endpoint, or null if it takes a range. */
+  function temperatureControl(settings) {
+    const direct = FIXED_TEMPERATURE[providerById(settings.providerId).id]
+    if (direct) return direct
+    // A custom address that is really Moonshot speaks Moonshot's dialect.
+    if (/(^|\.)api\.moonshot\.cn$/.test(hostOf(settings.baseUrl))) return FIXED_TEMPERATURE.moonshot
+    return null
+  }
+
+  /** True when the selected model decides its own temperature. */
+  function temperatureIsFixed(settings) {
+    const control = temperatureControl(settings)
+    return Boolean(control?.test((settings.model ?? '').trim()))
+  }
+
+  /**
+   * The temperature to actually send: the configured value, or `undefined` to
+   * omit the field for a model that only accepts one value.
+   */
+  function effectiveTemperature(settings) {
+    if (temperatureIsFixed(settings)) return undefined
+    const value = Number(settings.temperature)
+    return Number.isFinite(value) ? value : undefined
+  }
+
+  /**
    * Which stored key belongs to this endpoint/model pair. Keyed by the address
    * rather than the provider id, because every custom endpoint shares the id
    * "custom" and two different relays must not share one key.
@@ -364,6 +405,9 @@
     thinkingControl,
     thinkingInfo,
     thinkingBody,
+    temperatureControl,
+    temperatureIsFixed,
+    effectiveTemperature,
     apiKeySlot,
     streamChat,
   }

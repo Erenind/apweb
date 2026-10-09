@@ -85,6 +85,46 @@ function eq(name, actual, expected) {
     {},
   )
   eq('apiKeySlot trims trailing slash', AICore.apiKeySlot({ baseUrl: 'https://a.com/', model: ' m ' }), 'https://a.com|m')
+  console.log('temperature policy')
+  eq(
+    'kimi-k3 fixes its temperature (field omitted)',
+    AICore.effectiveTemperature({ providerId: 'moonshot', model: 'kimi-k3', temperature: 0.3 }),
+    undefined,
+  )
+  eq(
+    'kimi-k2.6 fixes its temperature too',
+    AICore.effectiveTemperature({ providerId: 'moonshot', model: 'kimi-k2.6', temperature: 0.3 }),
+    undefined,
+  )
+  eq(
+    'other Moonshot models still take ours',
+    AICore.effectiveTemperature({ providerId: 'moonshot', model: 'moonshot-v1-8k', temperature: 0.3 }),
+    0.3,
+  )
+  eq(
+    'gpt-5 reasoning models take only the default',
+    AICore.effectiveTemperature({ providerId: 'openai', model: 'gpt-5', temperature: 0.3 }),
+    undefined,
+  )
+  eq(
+    'a custom address pointed at Moonshot follows the same rule',
+    AICore.effectiveTemperature({
+      providerId: 'custom',
+      baseUrl: 'https://api.moonshot.cn/v1',
+      model: 'kimi-k3',
+      temperature: 0.3,
+    }),
+    undefined,
+  )
+  eq(
+    'other providers are untouched',
+    AICore.effectiveTemperature({ providerId: 'deepseek', model: 'deepseek-flash', temperature: 0.3 }),
+    0.3,
+  )
+  check(
+    'a non-numeric temperature is dropped rather than sent as NaN',
+    AICore.effectiveTemperature({ providerId: 'deepseek', model: 'x', temperature: 'warm' }) === undefined,
+  )
   check('selectionTurnText keeps scope rule', AICore.selectionTurnText('hello').includes(AICore.SCOPE_RULE))
   check('selectionTurnText quotes text', AICore.selectionTurnText('hello').includes('"""\nhello\n"""'))
   eq('short selection threshold', AICore.SHORT_SELECTION_LENGTH, 40)

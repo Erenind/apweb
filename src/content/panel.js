@@ -365,6 +365,8 @@
         refs.triggerSelect = null
         refs.actionSelect = null
         refs.actionHint = null
+        refs.keyInput = null
+        refs.keyHint = null
       }
       syncComposer()
     }
@@ -837,7 +839,9 @@
             baseUrl: settings.baseUrl,
             apiKey: settings.apiKey,
             model: settings.model,
-            temperature: settings.temperature,
+            // Undefined for models that only accept one temperature, so the field
+            // is left out of the request instead of being a 400.
+            temperature: AICore.effectiveTemperature(settings),
             messages: payload,
             settings,
           },
@@ -1060,6 +1064,7 @@
             '接口地址',
             textControl(settings.baseUrl, (value) => {
               update({ baseUrl: value })
+              refreshKeyFields()
               syncComposer()
             }, { type: 'url', placeholder: 'https://api.example.com/v1', 'data-field': 'base-url' }),
             settings.baseUrl ? null : h('span', { class: 'apweb-warn-inline', text: '填上接口地址才能发送' }),
@@ -1071,7 +1076,7 @@
       const listId = 'apweb-model-suggestions'
       const modelInput = textControl(settings.model, (value) => {
         update({ model: value })
-        refreshKeyHint()
+        refreshKeyFields()
         refreshThinking()
         syncComposer()
         syncHeader()
@@ -1097,7 +1102,7 @@
       refs.settingsEl.appendChild(
         field(
           'API Key',
-          h('input', {
+          (refs.keyInput = h('input', {
             type: 'password',
             value: settings.apiKey,
             spellcheck: 'false',
@@ -1105,7 +1110,7 @@
             placeholder: 'sk-...',
             'data-field': 'api-key',
             on: { input: (event) => update({ apiKey: event.target.value }) },
-          }),
+          })),
           refs.keyHint,
         ),
       )
@@ -1322,9 +1327,22 @@
       ])
     }
 
-    function refreshKeyHint() {
-      if (!refs.keyHint) return
+    /**
+     * Sync the key field with the endpoint+model pair that is selected now.
+     *
+     * Keys are stored per `baseUrl|model`, so changing the model (or a custom
+     * address) makes `settings.apiKey` that pair's key — empty when there is none
+     * yet. The input has to follow, otherwise it keeps showing the previous
+     * model's key and the next keystroke there would save *that* key under the new
+     * model, which is exactly how "the api-key didn't change with the model" shows
+     * up. Assigning only when the value differs keeps typing undisturbed.
+     */
+    function refreshKeyFields() {
       const settings = S()
+      if (refs.keyInput && refs.keyInput.value !== settings.apiKey) {
+        refs.keyInput.value = settings.apiKey
+      }
+      if (!refs.keyHint) return
       const provider = AICore.providerById(settings.providerId)
       refs.keyHint.textContent = `这个 key 只用于 ${provider.label} · ${settings.model || '（未填模型）'}，换模型会自动换成对应的 key`
     }
@@ -1440,6 +1458,7 @@
       syncHeader()
       refreshModeControl()
       refreshSelectionFields()
+      refreshKeyFields()
       syncComposer()
       // A change that came from another surface (options page / another tab) has
       // to be reflected in the transcript too.

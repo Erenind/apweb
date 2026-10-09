@@ -533,6 +533,42 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
       .every((i) => i.classList.contains('apweb-switch')),
   )
 
+  console.log('api key follows the model')
+  const fieldInput = (name) =>
+    settingsEl.querySelectorAll('input').find((i) => i.getAttribute('data-field') === name)
+  const keyInput = fieldInput('api-key')
+  const modelInput = fieldInput('model')
+  check('the key field is present', !!keyInput && !!modelInput)
+
+  // Save a key for the model that is selected now.
+  keyInput.value = 'sk-for-first'
+  keyInput.dispatch('input', { target: keyInput })
+  check('the key is stored for the current pair', AIStore.state.settings.apiKey === 'sk-for-first')
+
+  // Typing a different model name switches to that pair's key — which is empty —
+  // instead of leaving the previous model's key in the box.
+  modelInput.value = 'deepseek-v4-pro'
+  modelInput.dispatch('input', { target: modelInput })
+  check('the field follows the new model', keyInput.value === '')
+  check('the new pair has no key yet', AIStore.state.settings.apiKey === '')
+  check(
+    'the old key stays bound to the old model',
+    AIStore.state.settings.apiKeys['https://api.deepseek.com|deepseek-flash'] === 'sk-for-first',
+  )
+  check('the hint names the new model', keyInput.closest('label').textContent.includes('deepseek-v4-pro'))
+
+  // With the box cleared, typing can no longer resurrect the old key under the
+  // new model — the bug behind "the api-key didn't change with the model".
+  keyInput.value = 'sk-for-second'
+  keyInput.dispatch('input', { target: keyInput })
+  check(
+    'the new model gets its own key',
+    AIStore.state.settings.apiKeys['https://api.deepseek.com|deepseek-v4-pro'] === 'sk-for-second',
+  )
+  modelInput.value = 'deepseek-flash'
+  modelInput.dispatch('input', { target: modelInput })
+  check('switching back shows the first model’s key', keyInput.value === 'sk-for-first')
+
   console.log('prompt editors start folded')
   const prompts = settingsEl.querySelector('.apweb-prompts')
   check('prompt editor collapsed by default', !prompts.open)
@@ -863,6 +899,25 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
     panel.el.querySelector('.apweb-msg__body').innerHTML.includes('来自侧栏'),
   )
   check('remote messages land in the store', AIStore.state.messages[0].content === '来自侧栏')
+
+  console.log('temperature reaches the request only when the model takes one')
+  AIStore.updateSettings({ providerId: 'moonshot', model: 'kimi-k3', apiKey: 'sk-moonshot' })
+  textarea.value = '温度测试'
+  textarea.dispatch('input', { target: textarea })
+  textarea.dispatch('keydown', { key: 'Enter', shiftKey: false, isComposing: false, target: textarea })
+  await tick()
+  await tick()
+  const fixedRequest = lastChatRequest()
+  check('kimi-k3 is asked without a temperature field', fixedRequest?.temperature === undefined)
+  check('but the messages still go out', Array.isArray(fixedRequest?.messages) && fixedRequest.messages.length > 0)
+
+  AIStore.updateSettings({ providerId: 'moonshot', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' })
+  textarea.value = '温度测试二'
+  textarea.dispatch('input', { target: textarea })
+  textarea.dispatch('keydown', { key: 'Enter', shiftKey: false, isComposing: false, target: textarea })
+  await tick()
+  await tick()
+  check('a range-taking Moonshot model gets our temperature', lastChatRequest()?.temperature === 0.3)
 
   console.log(failures ? `\n${failures} FAILURE(S)` : '\nall checks passed')
   process.exit(failures ? 1 : 0)
