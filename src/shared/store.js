@@ -137,6 +137,10 @@
 
     const contextMode = merged.contextMode === 'page' ? 'page' : 'paragraph'
 
+    // The 自定义 provider's own endpoint memory (see DEFAULT_SETTINGS).
+    const customBaseUrl = typeof merged.customBaseUrl === 'string' ? merged.customBaseUrl : ''
+    const customModel = typeof merged.customModel === 'string' ? merged.customModel : ''
+
     // The panel's last geometry, kept only if it is complete — a half-written
     // record would place the panel at NaN.
     const storedRect = merged.panelRect
@@ -160,6 +164,8 @@
       thinkingByProvider,
       thinking: thinkingByProvider[merged.providerId] ?? false,
       contextMode,
+      customBaseUrl,
+      customModel,
       panelRect,
       selectionTrigger,
       composerPrompts,

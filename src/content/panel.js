@@ -1047,12 +1047,21 @@
             settings.providerId,
             (id) => {
               const next = AICore.providerById(id)
-              update({
-                providerId: next.id,
-                ...(next.id === 'custom' ? {} : { baseUrl: next.baseUrl, model: next.model }),
-              })
+              // 自定义 has no preset to fall back on, so it restores its own last
+              // endpoint. Carrying the previous provider's address over would also
+              // carry its key, since a key belongs to an endpoint+model pair.
+              update(
+                next.id === 'custom'
+                  ? {
+                      providerId: 'custom',
+                      baseUrl: S().customBaseUrl,
+                      model: S().customModel,
+                    }
+                  : { providerId: next.id, baseUrl: next.baseUrl, model: next.model },
+              )
               renderSettings()
             },
+            { 'data-field': 'provider' },
           ),
         ),
       )
@@ -1063,7 +1072,13 @@
           field(
             '接口地址',
             textControl(settings.baseUrl, (value) => {
-              update({ baseUrl: value })
+              // Remember 自定义's own address as it is typed, so switching away and
+              // back does not start from a blank field.
+              update(
+                S().providerId === 'custom'
+                  ? { baseUrl: value, customBaseUrl: value }
+                  : { baseUrl: value },
+              )
               refreshKeyFields()
               syncComposer()
             }, { type: 'url', placeholder: 'https://api.example.com/v1', 'data-field': 'base-url' }),
@@ -1075,7 +1090,9 @@
       // Model ------------------------------------------------------------------
       const listId = 'apweb-model-suggestions'
       const modelInput = textControl(settings.model, (value) => {
-        update({ model: value })
+        update(
+          S().providerId === 'custom' ? { model: value, customModel: value } : { model: value },
+        )
         refreshKeyFields()
         refreshThinking()
         syncComposer()

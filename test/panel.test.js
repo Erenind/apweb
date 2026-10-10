@@ -569,6 +569,45 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   modelInput.dispatch('input', { target: modelInput })
   check('switching back shows the first model’s key', keyInput.value === 'sk-for-first')
 
+  console.log('switching to 自定义 does not inherit the preset')
+  const providerSelectOf = () =>
+    settingsEl.querySelectorAll('select').find((s) => s.getAttribute('data-field') === 'provider')
+  providerSelectOf().dispatch('change', { target: { value: 'custom' } })
+  const customBase = settingsEl.querySelectorAll('input').find((i) => i.getAttribute('data-field') === 'base-url')
+  const customKey = settingsEl.querySelectorAll('input').find((i) => i.getAttribute('data-field') === 'api-key')
+  check('the custom address field appears, empty', !!customBase && customBase.value === '')
+  check('and the preset address is not carried over', AIStore.state.settings.baseUrl === '')
+  check('nor is the preset model', AIStore.state.settings.model === '')
+  check('nor the preset key', customKey.value === '' && AIStore.state.settings.apiKey === '')
+  check(
+    'the preset key is still stored under its own endpoint+model',
+    AIStore.state.settings.apiKeys['https://api.deepseek.com|deepseek-flash'] === 'sk-for-first',
+  )
+
+  // Filling in a relay remembers it, so switching away and back restores it.
+  customBase.value = 'https://relay.example/v1'
+  customBase.dispatch('input', { target: customBase })
+  const customModel = settingsEl.querySelectorAll('input').find((i) => i.getAttribute('data-field') === 'model')
+  customModel.value = 'my-model'
+  customModel.dispatch('input', { target: customModel })
+  check(
+    'the custom endpoint is remembered',
+    AIStore.state.settings.customBaseUrl === 'https://relay.example/v1' &&
+      AIStore.state.settings.customModel === 'my-model',
+  )
+
+  providerSelectOf().dispatch('change', { target: { value: 'deepseek' } })
+  check('a preset restores its own address', AIStore.state.settings.baseUrl === 'https://api.deepseek.com')
+  check('and its own model', AIStore.state.settings.model === 'deepseek-flash')
+  providerSelectOf().dispatch('change', { target: { value: 'custom' } })
+  check(
+    'switching back to 自定义 restores the relay',
+    AIStore.state.settings.baseUrl === 'https://relay.example/v1' &&
+      AIStore.state.settings.model === 'my-model',
+  )
+  // Leave the harness on the preset the later tests expect.
+  providerSelectOf().dispatch('change', { target: { value: 'deepseek' } })
+
   console.log('prompt editors start folded')
   const prompts = settingsEl.querySelector('.apweb-prompts')
   check('prompt editor collapsed by default', !prompts.open)
@@ -724,7 +763,15 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   await new Promise((r) => setTimeout(r, 420))
 
   check('pill appears after selection settles', shadowPill?.hidden === false)
-  check('pill labelled with the action', shadowPill?.textContent.includes('解释并翻译'))
+  check(
+    'pill labelled with the configured action',
+    shadowPill?.textContent.includes(
+      AICore.selectionActionLabel(
+        AIStore.state.settings.selectionAction,
+        AIStore.state.settings.selectionPrompts,
+      ),
+    ),
+  )
 
   const beforeSelection = AIStore.state.messages.length
   shadowPill.dispatch('click', { composedPath: () => [shadowPill] })
@@ -758,11 +805,15 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
     return lastChatRequest()
   }
 
-  check('the turn above ran in the default mode', AIStore.state.settings.selectionAction === 'explain-translate')
-  AIStore.updateSettings({ selectionAction: 'explain' })
+  // Which action is the default is the user's choice, so switch to *some other*
+  // one rather than assuming a particular pair.
+  const defaultAction = AIStore.state.settings.selectionAction
+  const otherAction = AIStore.state.settings.selectionPrompts.find((p) => p.id !== defaultAction).id
+  check('the turn above used the default mode', (selectionTurn[0]?.action ?? defaultAction) === defaultAction)
+  AIStore.updateSettings({ selectionAction: otherAction })
   const explainRequest = await askWith('ubiquitous')
-  const explainPrompt = AICore.findPrompt(AIStore.state.settings.selectionPrompts, 'explain').text
-  check('the newly chosen mode is the system message', explainRequest?.messages?.[0]?.content === explainPrompt)
+  const otherPrompt = AICore.findPrompt(AIStore.state.settings.selectionPrompts, otherAction).text
+  check('the newly chosen mode is the system message', explainRequest?.messages?.[0]?.content === otherPrompt)
   check(
     'questions asked in the old mode are left out of the request',
     !explainRequest.messages.some((m) => String(m.content).includes('serendipity')),

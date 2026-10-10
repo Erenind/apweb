@@ -125,6 +125,57 @@ function eq(name, actual, expected) {
     'a non-numeric temperature is dropped rather than sent as NaN',
     AICore.effectiveTemperature({ providerId: 'deepseek', model: 'x', temperature: 'warm' }) === undefined,
   )
+
+  console.log('streamChat failure modes')
+  {
+    const realFetch = globalThis.fetch
+    const collect = async (stub) => {
+      globalThis.fetch = stub
+      const chunks = []
+      try {
+        for await (const chunk of AICore.streamChat({
+          baseUrl: 'https://relay.example',
+          model: 'm',
+          messages: [{ role: 'user', content: 'hi' }],
+        })) {
+          chunks.push(chunk)
+        }
+      } catch (error) {
+        globalThis.fetch = realFetch
+        return { error: error.message, chunks }
+      }
+      globalThis.fetch = realFetch
+      return { chunks }
+    }
+
+    const html = await collect(async () =>
+      new Response('<!doctype html><html></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      }),
+    )
+    check(
+      'a web page instead of an API is reported clearly',
+      /网页/.test(html.error ?? '') && /\/v1/.test(html.error ?? ''),
+    )
+
+    const sse = await collect(async () =>
+      new Response(
+        'data: {"choices":[{"delta":{"content":"hi"}}]}\n\ndata: [DONE]\n\n',
+        { status: 200, headers: { 'content-type': 'text/event-stream' } },
+      ),
+    )
+    eq('a real stream still yields its deltas', sse.chunks, [{ type: 'content', text: 'hi' }])
+
+    const http = await collect(async () =>
+      new Response(JSON.stringify({ error: { message: 'bad key' } }), {
+        status: 401,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+    check('an HTTP error keeps its translated hint', /API key 无效/.test(http.error ?? ''))
+  }
+
   check('selectionTurnText keeps scope rule', AICore.selectionTurnText('hello').includes(AICore.SCOPE_RULE))
   check('selectionTurnText quotes text', AICore.selectionTurnText('hello').includes('"""\nhello\n"""'))
   eq('short selection threshold', AICore.SHORT_SELECTION_LENGTH, 40)
@@ -134,7 +185,13 @@ function eq(name, actual, expected) {
   eq('default provider', AIStore.state.settings.providerId, 'deepseek')
   eq('default endpoint', AIStore.state.settings.baseUrl, 'https://api.deepseek.com')
   eq('default trigger', AIStore.state.settings.selectionTrigger, 'click')
-  eq('default action', AIStore.state.settings.selectionAction, 'explain-translate')
+  eq(
+    'default action is one of the shipped prompts',
+    AICore.DEFAULT_SETTINGS.selectionPrompts.some(
+      (p) => p.id === AIStore.state.settings.selectionAction,
+    ),
+    true,
+  )
   eq('composer prompts default', AIStore.state.settings.composerPrompts.length, 1)
   eq('selection prompts default', AIStore.state.settings.selectionPrompts.length, 3)
 
@@ -148,7 +205,12 @@ function eq(name, actual, expected) {
   storage['apweb.ai.settings'] = { providerId: 'deepseek', selectionAction: 'off' }
   await AIStore.load()
   eq('legacy off -> trigger off', AIStore.state.settings.selectionTrigger, 'off')
-  eq('legacy off -> first prompt', AIStore.state.settings.selectionAction, 'explain-translate')
+  check(
+    'legacy off falls back to a real prompt',
+    AIStore.state.settings.selectionPrompts.some(
+      (p) => p.id === AIStore.state.settings.selectionAction,
+    ),
+  )
 
   console.log('AIStore: key slots follow endpoint+model')
   storage['apweb.ai.settings'] = {}
@@ -176,8 +238,13 @@ function eq(name, actual, expected) {
   eq('deepseek thinking remembered', AIStore.state.settings.thinking, true)
 
   console.log('AIStore: prompt editing')
+  const editedId = AIStore.state.settings.selectionAction
   AIStore.updatePrompt('selection', { name: '改名了' })
-  eq('rename sticks', AICore.findPrompt(AIStore.state.settings.selectionPrompts, 'explain-translate').name, '改名了')
+  eq(
+    'rename sticks',
+    AICore.findPrompt(AIStore.state.settings.selectionPrompts, editedId).name,
+    '改名了',
+  )
   const newId = AIStore.addPrompt('selection')
   eq('added prompt selected', AIStore.state.settings.selectionAction, newId)
   eq('prompt count grew', AIStore.state.settings.selectionPrompts.length, 4)

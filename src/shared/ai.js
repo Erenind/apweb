@@ -53,6 +53,12 @@
     // { left, top, width, height }. null until the panel is first moved or
     // resized, so a fresh install uses the default top-right card.
     panelRect: null,
+    // The endpoint/model last used with the 自定义 provider. Presets own theirs,
+    // so only 自定义 needs a memory: switching away and back should bring your own
+    // relay back, not inherit whichever preset you happened to be on (and with it
+    // that preset's key, which shares the same endpoint+model slot).
+    customBaseUrl: '',
+    customModel: '',
     // Whether the composer (input + send) is unfolded.
     composerOpen: true,
     // DeepSeek's own default is thinking on, but that makes every question wait
@@ -346,6 +352,14 @@
 
     if (!response.ok) throw await toError(response)
     if (!response.body) throw new Error('这个接口没有返回流式内容')
+
+    // A relay whose address is missing its path segment (…/v1) happily answers
+    // 200 with its own web page. Without this the stream just yields nothing and
+    // the panel says "（没有返回内容）", which hides the real problem.
+    const contentType = response.headers.get('content-type') ?? ''
+    if (contentType.includes('text/html')) {
+      throw new Error('这个地址返回的是网页，不是接口数据：接口地址大概写错了（常见是漏了 /v1）')
+    }
 
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
