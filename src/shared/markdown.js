@@ -7,10 +7,16 @@
 // smuggle HTML into an answer. Everything therefore goes through DOMPurify, and
 // images are dropped outright (a remote <img> would leak that you read the
 // answer, and would be a tracking pixel the page controls).
+//
+// LaTeX maths is handled around the sanitiser: `AIMath` swaps the formulas for
+// inert tokens first and KaTeX renders them back to MathML afterwards, so
+// DOMPurify keeps its strict allow-list while formulas still come out typeset.
 (function () {
   'use strict'
 
   const markedLib = globalThis.marked
+  const math = globalThis.AIMath
+  const katex = globalThis.katex
   const purifier =
     typeof globalThis.DOMPurify === 'function'
       ? globalThis.DOMPurify(globalThis)
@@ -27,6 +33,38 @@
 
   const ALLOWED_ATTR = ['href', 'title', 'target', 'rel', 'class', 'align']
 
+  /** Guard for the lengths KaTeX is willing to chew through. */
+  const MAX_TEX_LENGTH = 2000
+
+  const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
+
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, (char) => ESCAPES[char])
+  }
+
+  /**
+   * One formula as HTML. KaTeX escapes the LaTeX it is given and leaves \href,
+   * \url and the \html… commands inert unless `trust` is enabled — this stays on
+   * the defaults, so the result is safe to inject. Bad LaTeX renders as a red
+   * KaTeX error span instead of throwing; if KaTeX is missing altogether the raw
+   * formula is shown, escaped.
+   */
+  function renderMath(item) {
+    if (!katex?.renderToString) return escapeHtml(item.display ? `$$${item.tex}$$` : `$${item.tex}$`)
+    const tex = item.tex.length > MAX_TEX_LENGTH ? item.tex.slice(0, MAX_TEX_LENGTH) : item.tex
+    try {
+      return katex.renderToString(tex, {
+        output: 'mathml',
+        displayMode: item.display,
+        throwOnError: false,
+        trust: false,
+        maxExpand: 1000,
+      })
+    } catch {
+      return escapeHtml(item.display ? `$$${tex}$$` : `$${tex}$`)
+    }
+  }
+
   // Open links in a new tab, and never hand the opener over.
   if (purifier?.addHook) {
     purifier.addHook('afterSanitizeAttributes', (node) => {
@@ -42,21 +80,24 @@
     if (!source) return ''
     if (!markedLib || !purifier) return ''
 
+    const masked = math ? math.maskMath(source) : { text: source, items: [] }
+
     let html
     try {
-      html = markedLib.parse(source, { gfm: true, breaks: true })
+      html = markedLib.parse(masked.text, { gfm: true, breaks: true })
     } catch {
       // Malformed markdown should never take the panel down.
       return ''
     }
 
     try {
-      return purifier.sanitize(html, {
+      const clean = purifier.sanitize(html, {
         ALLOWED_TAGS,
         ALLOWED_ATTR,
         FORBID_TAGS: ['img', 'style', 'svg', 'math', 'iframe', 'form', 'input'],
         ALLOW_DATA_ATTR: false,
       })
+      return math ? math.unmaskMath(clean, masked.items, renderMath) : clean
     } catch {
       return ''
     }

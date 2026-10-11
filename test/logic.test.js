@@ -27,9 +27,11 @@ function load(rel) {
 
 load('src/shared/ai.js')
 load('src/shared/store.js')
+load('src/shared/math.js')
 
 const AICore = globalThis.AICore
 const AIStore = globalThis.AIStore
+const AIMath = globalThis.AIMath
 
 let failures = 0
 function check(name, cond) {
@@ -124,6 +126,46 @@ function eq(name, actual, expected) {
   check(
     'a non-numeric temperature is dropped rather than sent as NaN',
     AICore.effectiveTemperature({ providerId: 'deepseek', model: 'x', temperature: 'warm' }) === undefined,
+  )
+
+  console.log('LaTeX extraction')
+  {
+    const roundTrip = (source, render) => {
+      const masked = AIMath.maskMath(source)
+      return { ...masked, restored: AIMath.unmaskMath(masked.text, masked.items, render) }
+    }
+    const asPlain = (item) => `[${item.display ? 'block' : 'inline'}:${item.tex}]`
+
+    const both = roundTrip('能量是 $E=mc^2$，整块：\n\n$$\\int_0^1 x\\,dx$$\n', asPlain)
+    eq('two formulas are found', both.items.length, 2)
+    eq('inline TeX is kept verbatim', both.items[0].tex, 'E=mc^2')
+    eq('inline maths is not display mode', both.items[0].display, false)
+    eq('$$ is display mode', both.items[1].display, true)
+    eq(
+      'restoring puts the maths back in place',
+      both.restored,
+      '能量是 [inline:E=mc^2]，整块：\n\n[block:\\int_0^1 x\\,dx]\n',
+    )
+    check('no token survives unmasking', !both.restored.includes('apwebmathtoken'))
+  }
+  eq('backslash parens are inline maths', AIMath.maskMath('a \\(x^2\\) b').items[0].display, false)
+  eq('backslash brackets are display maths', AIMath.maskMath('a \\[x^2\\] b').items[0].display, true)
+  eq('< and > in maths survive', AIMath.maskMath('$a<b>c$').items[0].tex, 'a<b>c')
+  eq(
+    'two formulas keep their order',
+    AIMath.maskMath('$a$ and $b$').items.map((item) => item.tex),
+    ['a', 'b'],
+  )
+  eq('an escaped dollar is not maths', AIMath.maskMath('price is \\$5 today').items.length, 0)
+  eq('currency is not maths', AIMath.maskMath('it costs $5 and $10').items.length, 0)
+  eq('an unmatched delimiter is left alone', AIMath.maskMath('so $x^2 and then').items.length, 0)
+  eq('fenced code keeps its dollars', AIMath.maskMath('```\n$x^2$\n```').items.length, 0)
+  eq('inline code keeps its dollars', AIMath.maskMath('use `$x$` here').items.length, 0)
+  eq('multi-line display maths works', AIMath.maskMath('$$\na+b\n$$').items.length, 1)
+  eq(
+    'a replacement containing $ is inserted literally',
+    AIMath.unmaskMath('x apwebmathtoken0 y', [{ tex: 'a$b', display: false }], () => '<i>$&</i>'),
+    'x <i>$&</i> y',
   )
 
   console.log('streamChat failure modes')
@@ -265,6 +307,26 @@ function eq(name, actual, expected) {
   for (let i = 0; i < 70; i++) AIStore.pushMessage({ role: 'user', content: `m${i}` })
   eq('messages capped at 60', AIStore.state.messages.length, 60)
   eq('oldest dropped', AIStore.state.messages[0].content, 'm10')
+
+  // The real pipeline, minus DOMPurify (it needs a DOM, so it is stubbed): does a
+  // formula in a reply actually come out as MathML, and does code stay literal?
+  console.log('markdown + KaTeX wiring')
+  load('vendor/marked.umd.js')
+  load('vendor/katex.min.js')
+  globalThis.DOMPurify = { addHook() {}, sanitize: (html) => html }
+  load('src/shared/markdown.js')
+  {
+    const html = AIMarkdown.renderMarkdown('能量是 $E=mc^2$。\n\n$$\\frac{1}{2}$$')
+    check('inline maths renders as MathML', html.includes('<math') && html.includes('<msup>'))
+    check('display maths is block level', html.includes('display="block"'))
+    check('no placeholder leaks into the output', !html.includes('apwebmathtoken'))
+    check('the surrounding markdown still renders', html.includes('<p>'))
+    check('the TeX source is kept for screen readers', html.includes('application/x-tex'))
+    const code = AIMarkdown.renderMarkdown('use `$x$` here')
+    check('maths inside code spans stays literal', code.includes('$x$') && !code.includes('<math'))
+    const bad = AIMarkdown.renderMarkdown('$\\frac{1}{$')
+    check('broken TeX does not throw or inject HTML', typeof bad === 'string' && !/<script/i.test(bad))
+  }
 
   console.log(failures ? `\n${failures} FAILURE(S)` : '\nall checks passed')
   process.exit(failures ? 1 : 0)

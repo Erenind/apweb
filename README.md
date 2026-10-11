@@ -84,6 +84,12 @@
 - 回答渲染前一律过 **DOMPurify**，并且**图片一律丢弃**——模型能读到网页内容，
   而网页可以诱导模型输出 HTML，一张远程 `<img>` 就等于一个能被网页控制的追踪像素；
   `javascript:` 链接会被剥掉，正常链接一律 `target="_blank" rel="noopener noreferrer nofollow"`。
+- **数学公式会渲染**：行内 `$…$` / `\(…\)`、独立成行 `$$…$$` / `\[…\]` 交给 **KaTeX**
+  （只带 JS 构建、输出 **MathML**，不需要 KaTeX 的 CSS 和 1.2MB 字体，Firefox 原生排版）。
+  顺序是「先把公式换成占位符 → 过 marked 和 DOMPurify → 再把 KaTeX 产物填回去」，
+  这样 DOMPurify 的白名单不必为 MathML 开口子；公式原文也保留在 `<annotation>` 里，
+  复制和读屏都能拿到。代码块、行内代码里的 `$` 不会被当成公式，`\$` 与 `$5 and $10`
+  这类也不是；写坏的公式会渲染成一行红色提示而不会报错。
 
 ## 和 Reader 不同的地方（有意为之）
 
@@ -131,6 +137,7 @@
 | --- | --- |
 | `manifest.json` | MV3 清单：后台页、内容脚本、工具栏按钮、选项页 |
 | `src/shared/ai.js` | Reader `src/lib/ai.js` 的移植：服务商、思考开关、提示词、流式客户端 |
+| `src/shared/math.js` | LaTeX 抽取：把公式换成占位符、渲染后填回（`test/logic.test.js` 覆盖边界情况） |
 | `src/shared/markdown.js` | Reader `src/lib/markdown.js` 的移植：marked + DOMPurify |
 | `src/shared/store.js` | Reader `src/lib/chat-storage.js` 的移植：设置/消息持久化与归一化 |
 | `src/background.js` | 后台事件页：发请求（绕开网页 CORS）、流式回传、工具栏按钮、每标签页面板状态 |
@@ -140,7 +147,7 @@
 | `src/options/options.html` | 首选项页：复用同一个面板 |
 | `test/` | 三个零依赖测试（node 内置模块），见下面「验证」 |
 | `web-ext-config.mjs` | `web-ext lint` / `build` 的忽略清单（把测试和文档排除在打包外） |
-| `vendor/` | `marked`、`DOMPurify` 两个浏览器 UMD 构建（来自 Reader 的 node_modules） |
+| `vendor/` | `marked`、`DOMPurify`（来自 Reader 的 node_modules）与 `katex.min.js` 三个 UMD 构建，版本与许可见 `vendor/LICENSES.md` |
 | `icons/` | 图标：`icon.svg` 是真源，`icon-*.png` 由它生成 |
 
 ## 为什么没有构建步骤

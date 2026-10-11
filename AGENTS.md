@@ -44,4 +44,5 @@ Commit subjects are short, lowercase and descriptive (`save panel rect`); one be
 - Persisted keys are namespaced `apweb.*`; store plain data only (DOM nodes are not structured-cloneable).
 - The panel's last `{ left, top, width, height }` lives in settings as `panelRect`; clamp it on restore.
 - The composer folds via the `composerOpen` setting.
+- Assistant replies render LaTeX: `src/shared/math.js` masks formulas before markdown and KaTeX (MathML-only build, in `vendor/`) renders them after sanitising. Never widen DOMPurify's allow-list for maths.
 - Refresh `vendor/` from `../apreader/node_modules` per `vendor/LICENSES.md`; regenerate icons with the `magick` loop in `README.md`.

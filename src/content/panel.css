@@ -406,6 +406,20 @@
   border-top: 1px solid var(--ap-border);
 }
 
+/* KaTeX is vendored in its MathML-only build, so there is no KaTeX stylesheet to
+   load — Firefox lays the maths out itself. Display maths only needs breathing
+   room and a way to scroll a formula that is wider than the panel. */
+.apweb-msg__body--md .katex math[display='block'] {
+  display: block;
+  margin: 8px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.apweb-msg__body--md .katex-error {
+  color: var(--ap-danger);
+}
+
 .apweb-thinking {
   margin-bottom: 5.6px;
   border: 1px dashed var(--ap-border-hover);

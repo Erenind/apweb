@@ -28,7 +28,9 @@
       "js": [
         "vendor/marked.umd.js",
         "vendor/purify.min.js",
+        "vendor/katex.min.js",
         "src/shared/ai.js",
+        "src/shared/math.js",
         "src/shared/markdown.js",
         "src/shared/store.js",
         "src/content/panel.js",
