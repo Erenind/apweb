@@ -1,8 +1,4 @@
 <div align="center"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-<<<<<<< HEAD
-=======
-  <svg>
->>>>>>> 56b2d81 (English version)
   <!-- Same family as the reader's icon: a rounded-rect badge holding a
        speech bubble whose tail flows out of the bottom-left corner with a
        rounded tip (no sharp angles anywhere). The sparkle inside marks it as
@@ -20,11 +16,7 @@
     stroke-linejoin="round"
   />
 </svg>
-<<<<<<< HEAD
-<img width="64" height="64" alt="icon" src="https://github.com/user-attachments/assets/7d54f34d-f47e-4b77-a12c-b07e66b1e8d4" />
-=======
 <!-- <img width="64" height="64" alt="icon" src="https://github.com/user-attachments/assets/7d54f34d-f47e-4b77-a12c-b07e66b1e8d4" /> -->
->>>>>>> 56b2d81 (English version)
 </div>
 
 
