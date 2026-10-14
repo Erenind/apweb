@@ -1,4 +1,8 @@
 <div align="center"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+<<<<<<< HEAD
+=======
+  <svg>
+>>>>>>> 56b2d81 (English version)
   <!-- Same family as the reader's icon: a rounded-rect badge holding a
        speech bubble whose tail flows out of the bottom-left corner with a
        rounded tip (no sharp angles anywhere). The sparkle inside marks it as
@@ -16,7 +20,11 @@
     stroke-linejoin="round"
   />
 </svg>
+<<<<<<< HEAD
 <img width="64" height="64" alt="icon" src="https://github.com/user-attachments/assets/7d54f34d-f47e-4b77-a12c-b07e66b1e8d4" />
+=======
+<!-- <img width="64" height="64" alt="icon" src="https://github.com/user-attachments/assets/7d54f34d-f47e-4b77-a12c-b07e66b1e8d4" /> -->
+>>>>>>> 56b2d81 (English version)
 </div>
 
 
@@ -51,6 +59,12 @@ video/gifs
 
 ## 用法
 
+- **界面语言跟随浏览器**：`browser.i18n.getUILanguage()` 是中文就用中文，其它一律用英文
+  （取不到时退回 `navigator.language`；内容脚本里这一项由后台页随面板状态一起下发，
+  因为内容脚本不一定有 i18n 权限）。**对话语言也跟着走**：默认提示词就是按当前语言发的，
+  英文浏览器里默认助手会要求"write them in English"，划词默认动作也变成英文的
+  "Explain and translate"。你自己改过的提示词不会被覆盖——只有仍是**出厂原文**的那些
+  才会在语言切换时跟着换。没有面板内的语言开关，改语言就改浏览器语言。
 - **开启划词即问**：点 ⚙ 打开设置，表单顶部就是一个醒目的 `✦ 启动划词即问` 按钮，
   开启后变成实心绿色的 `✦ 划词即问 · 已开启`，下面一行小字说明当前行为；点它即可切回
   「选中后显示按钮」。它和下面的「划词提问」下拉是同一个设置，两边同步。
@@ -164,6 +178,7 @@ video/gifs
 | --- | --- |
 | `manifest.json` | MV3 清单：后台页、内容脚本、工具栏按钮、选项页 |
 | `src/shared/ai.js` | Reader `src/lib/ai.js` 的移植：服务商、思考开关、提示词、流式客户端 |
+| `src/shared/i18n.js` | 界面与对话语言：zh/en 两份文案表，按浏览器语言取用（每个宿主都必须最先加载它） |
 | `src/shared/math.js` | LaTeX 抽取：把公式换成占位符、渲染后填回（`test/logic.test.js` 覆盖边界情况） |
 | `src/shared/markdown.js` | Reader `src/lib/markdown.js` 的移植：marked + DOMPurify |
 | `src/shared/store.js` | Reader `src/lib/chat-storage.js` 的移植：设置/消息持久化与归一化 |

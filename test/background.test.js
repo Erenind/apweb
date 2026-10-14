@@ -41,6 +41,7 @@ function load(rel) {
   vm.runInThisContext(fs.readFileSync(path.join(ROOT, rel), 'utf8'), { filename: rel })
 }
 
+load('src/shared/i18n.js')
 load('src/shared/ai.js')
 load('src/background.js')
 
@@ -70,10 +71,11 @@ const fromTab = (id, windowId = 1) => ({ tab: { id, windowId } })
   check('tab removal is watched', onRemoved.length > 0)
 
   console.log('per-tab panel state')
-  check(
-    'a fresh tab starts closed',
-    (await dispatchRuntimeMessage({ t: 'apweb:panel-state' }, fromTab(42)))?.open === false,
-  )
+  const freshState = await dispatchRuntimeMessage({ t: 'apweb:panel-state' }, fromTab(42))
+  check('a fresh tab starts closed', freshState?.open === false)
+  // The content script takes its UI language from here, because a content script
+  // may not have i18n access of its own.
+  check('the reply carries the UI language', typeof freshState?.language === 'string')
   await dispatchRuntimeMessage({ t: 'apweb:set-panel-state', open: true }, fromTab(42))
   check(
     'the state is remembered for that tab',

@@ -14,6 +14,7 @@
   'use strict'
 
   const AICore = globalThis.AICore
+  const i18n = globalThis.AII18n
   const api = globalThis.browser ?? globalThis.chrome
   const PORT_NAME = 'apweb-ai'
   const PANEL_STATE_PREFIX = 'apweb.panel.'
@@ -98,12 +99,15 @@
 
   async function readPanelState(sender) {
     const key = stateKey(sender)
-    if (!key || !api.storage?.session) return { open: false }
+    // The language rides along: the background page always has i18n access, while
+    // a content script may not, and the panel needs it before it builds anything.
+    const language = i18n?.language?.() ?? null
+    if (!key || !api.storage?.session) return { open: false, language }
     try {
       const stored = await api.storage.session.get(key)
-      return { open: stored?.[key] === true }
+      return { open: stored?.[key] === true, language }
     } catch {
-      return { open: false }
+      return { open: false, language }
     }
   }
 

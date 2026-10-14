@@ -11,6 +11,7 @@
   'use strict'
 
   const AICore = globalThis.AICore
+  const i18n = globalThis.AII18n
   const api = globalThis.browser ?? globalThis.chrome
 
   const SETTINGS_KEY = 'apweb.ai.settings'
@@ -122,8 +123,10 @@
     const composerPrompts = mergePrompts(
       DEFAULT_SETTINGS.composerPrompts,
       merged.composerPrompts ?? merged.systemPrompts,
+    ).map((prompt) => i18n.localizeShippedPrompt('composer', prompt))
+    const selectionPrompts = mergePrompts(DEFAULT_SETTINGS.selectionPrompts, merged.selectionPrompts).map(
+      (prompt) => i18n.localizeShippedPrompt('selection', prompt),
     )
-    const selectionPrompts = mergePrompts(DEFAULT_SETTINGS.selectionPrompts, merged.selectionPrompts)
 
     // A reader-era `selectionAction: 'off'` meant "don't auto-send"; map it onto
     // the trigger switch rather than leaving a prompt list with no selection.
@@ -335,7 +338,7 @@
 
     list.push({
       id,
-      name: `${(current ?? base).name} 副本`,
+      name: i18n.t('promptCopy', { name: (current ?? base).name }),
       text: (current ?? base).text,
     })
     settings[promptIdKey(kind)] = id

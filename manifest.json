@@ -18,7 +18,7 @@
   "permissions": ["storage", "scripting"],
   "host_permissions": ["<all_urls>"],
   "background": {
-    "scripts": ["src/shared/ai.js", "src/background.js"]
+    "scripts": ["src/shared/i18n.js", "src/shared/ai.js", "src/background.js"]
   },
   "content_scripts": [
     {
@@ -29,6 +29,7 @@
         "vendor/marked.umd.js",
         "vendor/purify.min.js",
         "vendor/katex.min.js",
+        "src/shared/i18n.js",
         "src/shared/ai.js",
         "src/shared/math.js",
         "src/shared/markdown.js",

@@ -14,6 +14,7 @@
   const AICore = globalThis.AICore
   const AIStore = globalThis.AIStore
   const AIPanel = globalThis.AIPanel
+  const i18n = globalThis.AII18n
   const api = globalThis.browser ?? globalThis.chrome
 
   // Content scripts can be injected twice (e.g. after an extension reload on an
@@ -148,15 +149,15 @@
   /** What to attach for `contextMode`. Always returns a label so the chip reads. */
   function describeContext({ mode, selectionText: selected }) {
     if (mode === 'page') {
-      return { label: '页面正文', text: pageText() }
+      return { label: i18n.t('pageContextLabel'), text: pageText() }
     }
 
     const range = currentRange()
     if (range) {
       const text = nearestBlockText(range, selected)
-      if (text) return { label: '选中处那一段', text }
+      if (text) return { label: i18n.t('paragraphContextLabel'), text }
     }
-    return { label: '页面正文', text: pageText(PARAGRAPH_LIMIT) }
+    return { label: i18n.t('pageContextLabel'), text: pageText(PARAGRAPH_LIMIT) }
   }
 
   /* ---------------------------------- pill ---------------------------------- */
@@ -194,7 +195,7 @@
     pillAction = action
     const label = AICore.selectionActionLabel(action, settings.selectionPrompts)
     pillLabel.textContent = label
-    pill.title = `用 AI 处理选中的文字（${label}）`
+    pill.title = i18n.t('pillTitle', { label })
     pill.hidden = false
 
     const width = pill.offsetWidth || 80
@@ -299,7 +300,6 @@
   async function boot() {
     if (!document.documentElement) return
     buildHost()
-    await AIStore.load()
 
     // The panel's open state is per tab (kept by the background), not a global
     // setting: a fresh tab starts closed, while navigating inside a tab keeps
@@ -308,9 +308,16 @@
     try {
       const reply = await api.runtime.sendMessage({ t: 'apweb:panel-state' })
       startOpen = reply?.open === true
+      // The UI language comes from the background page: it always has i18n access,
+      // whereas a content script may only have navigator.language. Setting it here
+      // — before the store normalises the shipped prompts — keeps the panel, the
+      // default prompts and the answers all in one language.
+      i18n.language(reply?.language ?? undefined)
     } catch {
       // No background yet: start closed.
     }
+
+    await AIStore.load()
 
     panel = AIPanel.createPanel({
       getSelection: selectionText,

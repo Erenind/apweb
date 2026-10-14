@@ -379,6 +379,10 @@ function makePort(name) {
 }
 
 globalThis.browser = {
+  // The panel's UI language follows the browser's; pin it to Chinese so the
+  // assertions below can read the strings, and exercise English separately in
+  // logic.test.js.
+  i18n: { getUILanguage: () => 'zh-CN' },
   storage: {
     onChanged: {
       addListener: (fn) => storageListeners.push(fn),
@@ -445,6 +449,7 @@ function load(rel) {
   vm.runInThisContext(fs.readFileSync(`${ROOT}/${rel}`, 'utf8'), { filename: rel })
 }
 
+load('src/shared/i18n.js')
 load('src/shared/ai.js')
 load('src/shared/store.js')
 load('src/content/panel.js')

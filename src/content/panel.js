@@ -11,6 +11,7 @@
   const AICore = globalThis.AICore
   const AIMarkdown = globalThis.AIMarkdown
   const AIStore = globalThis.AIStore
+  const i18n = globalThis.AII18n
   const api = globalThis.browser ?? globalThis.chrome
 
   const PORT_NAME = 'apweb-ai'
@@ -142,7 +143,7 @@
       })
 
       port.onDisconnect.addListener(() => {
-        if (!settled) finish(() => reject(new Error('后台连接已断开，请重试')))
+        if (!settled) finish(() => reject(new Error(i18n.t('connectionLost'))))
       })
 
       try {
@@ -228,25 +229,25 @@
     refs.dot = h('span', { class: 'apweb-dot' })
     refs.clearBtn = h('button', {
       type: 'button',
-      title: '清空对话',
-      text: '清空',
+      title: i18n.t('clearChat'),
+      text: i18n.t('clear'),
       on: { click: () => clearChat() },
     })
     refs.settingsBtn = h('button', {
       type: 'button',
-      title: '设置',
+      title: i18n.t('settings'),
       text: '⚙',
       on: { click: () => setShowSettings(!showSettings) },
     })
     const closeBtn = h('button', {
       type: 'button',
-      title: '收起',
+      title: i18n.t('collapse'),
       text: '✕',
       on: { click: () => setOpen(false) },
     })
 
     const head = h('header', { class: 'apweb-panel__head' }, [
-      h('div', { class: 'apweb-title' }, [refs.dot, h('strong', { text: 'AI 助手' }), refs.model]),
+      h('div', { class: 'apweb-title' }, [refs.dot, h('strong', { text: i18n.t('assistant') }), refs.model]),
       h('div', { class: 'apweb-head-actions' }, [
         refs.settingsBtn,
         refs.clearBtn,
@@ -260,7 +261,7 @@
 
     refs.input = h('textarea', {
       rows: 2,
-      placeholder: 'Enter 发送，Shift+Enter 换行',
+      placeholder: i18n.t('composerPlaceholder'),
       on: {
         input: () => {
           draftText = refs.input.value
@@ -275,13 +276,13 @@
     refs.sendBtn = h('button', {
       type: 'button',
       class: 'apweb-send',
-      text: '发送',
+      text: i18n.t('send'),
       on: { click: () => void send() },
     })
     refs.stopBtn = h('button', {
       type: 'button',
       class: 'apweb-stop',
-      text: '停止',
+      text: i18n.t('stop'),
       hidden: true,
       on: { click: () => stop() },
     })
@@ -294,7 +295,7 @@
       type: 'button',
       class: 'apweb-composer__toggle',
       'data-field': 'composer-toggle',
-      title: '收起输入框',
+      title: i18n.t('foldComposer'),
       on: { click: () => setComposerOpen(!isComposerOpen()) },
     }, [h('span', { class: 'apweb-composer__chevron' })])
     refs.composerBody = h('div', { class: 'apweb-composer__body' }, [
@@ -329,7 +330,7 @@
       // drag — the size is saved exactly when the user finishes resizing.
       refs.resizeHandle = h('div', {
         class: 'apweb-resize-handle',
-        title: '拖动调整大小',
+        title: i18n.t('resizePanel'),
         'data-field': 'resize-handle',
       })
       refs.panel.appendChild(refs.resizeHandle)
@@ -496,16 +497,16 @@
       const on = trigger === 'auto'
       const off = trigger === 'off'
       btn.classList.toggle('apweb-mode__btn--on', on)
-      btn.textContent = on ? '✦ 划词即问 · 已开启' : '✦ 启动划词即问'
+      btn.textContent = on ? i18n.t('modeOn') : i18n.t('modeOff')
       btn.title = on
-        ? '点击改为「选中后显示按钮」'
-        : '点击开启：在网页上选中文字就直接发给 AI'
+        ? i18n.t('modeOnTitle')
+        : i18n.t('modeOffTitle')
       if (refs.modeHint) {
         refs.modeHint.textContent = on
-          ? '现在在任意网页选中文字，就会直接发给我。'
+          ? i18n.t('modeHintOn')
           : off
-            ? '划词提问目前是关闭的，点上面按钮开启「选中即发送」。'
-            : '开启后选中文字自动发送；关闭则改为弹出按钮、点击再发。'
+            ? i18n.t('modeHintOffWhenDisabled')
+            : i18n.t('modeHintOff')
       }
     }
 
@@ -545,8 +546,8 @@
       if (refs.actionHint) {
         refs.actionHint.textContent =
           trigger === 'off'
-            ? '划词提问现在是关闭的；选好用途后，把上面那项打开才会生效。'
-            : '选中文字后要做什么；「划词提问」一打开就按这里选的方式处理。'
+            ? i18n.t('purposeHintOff')
+            : i18n.t('purposeHintOn')
       }
     }
 
@@ -581,7 +582,7 @@
      */
     function applyComposer(open, animate) {
       refs.composer.classList.toggle('apweb-composer--collapsed', !open)
-      refs.composerToggle.title = open ? '收起输入框' : '展开输入框'
+      refs.composerToggle.title = open ? i18n.t('foldComposer') : i18n.t('unfoldComposer')
       refs.composerToggle.setAttribute('aria-expanded', String(open))
       // A clipped input must not stay in the tab order.
       for (const el of [refs.input, refs.sendBtn, refs.stopBtn]) {
@@ -664,7 +665,7 @@
         refs.msgs.appendChild(
           h('p', {
             class: 'apweb-hint',
-            text: '问点什么吧。在页面上选中文字会弹出「问 AI」按钮，也可以直接在这里提问。',
+            text: i18n.t('emptyHint'),
           }),
         )
         return
@@ -675,8 +676,8 @@
 
     function buildMessageNode(message) {
       const meta = h('div', { class: 'apweb-msg__meta' }, [
-        h('span', { text: message.role === 'user' ? '你' : 'AI' }),
-        message.context ? h('span', { class: 'apweb-msg__context', text: `上下文：${message.context}` }) : null,
+        h('span', { text: message.role === 'user' ? i18n.t('you') : 'AI' }),
+        message.context ? h('span', { class: 'apweb-msg__context', text: i18n.t('contextLabel', { context: message.context }) }) : null,
       ])
 
       if (message.role === 'assistant' && message.content) {
@@ -684,11 +685,11 @@
           h('button', {
             type: 'button',
             class: 'apweb-msg__copy',
-            text: '复制',
+            text: i18n.t('copy'),
             on: {
               click: async () => {
                 const ok = await copyText(message.content)
-                if (!ok) setFailure('复制失败：浏览器不允许写剪贴板')
+                if (!ok) setFailure(i18n.t('copyFailed'))
               },
             },
           }),
@@ -736,7 +737,7 @@
         const reasoning = message.reasoning ?? ''
         message._thinking.hidden = !reasoning
         if (reasoning) {
-          message._thinking.querySelector('summary').textContent = `思考过程（${reasoning.length} 字）`
+          message._thinking.querySelector('summary').textContent = i18n.t('thinking', { count: reasoning.length })
           message._thinkingP.textContent = reasoning
         }
       }
@@ -762,9 +763,11 @@
       if (!described?.text) return { context: '', contextInfo: '' }
 
       const { title, url } = pageInfo()
-      const source = url ? `《${title || '当前网页'}》(${url})` : `《${title || '当前网页'}》`
+      const source = url
+          ? i18n.t('contextSource', { title: title || i18n.t('currentPage'), url })
+          : i18n.t('contextSourceNoUrl', { title: title || i18n.t('currentPage') })
       const context =
-        `以下只是参考上下文，不要翻译、不要解释、不要总结，也不要在回答里复述：\n` +
+        `${i18n.t('contextPreamble')}\n` +
         `${source}${described.label}：\n"""\n${described.text}\n"""`
       return { context, contextInfo: described.label }
     }
@@ -776,8 +779,8 @@
 
       const highlight = includeSelection ? getSelection().trim() : ''
       if (highlight) {
-        parts.push(`用户选中的文字：\n"""\n${highlight}\n"""`)
-        info.push('选中文字')
+        parts.push(`${i18n.t('selectedTextPreamble')}\n"""\n${highlight}\n"""`)
+        info.push(i18n.t('selectedChip'))
       }
 
       if (includePage) {
@@ -787,9 +790,11 @@
         })
         if (described?.text) {
           const { title, url } = pageInfo()
-          const source = url ? `《${title || '当前网页'}》(${url})` : `《${title || '当前网页'}》`
+          const source = url
+          ? i18n.t('contextSource', { title: title || i18n.t('currentPage'), url })
+          : i18n.t('contextSourceNoUrl', { title: title || i18n.t('currentPage') })
           parts.push(
-            `以下只是参考上下文，不要翻译、不要解释、不要总结，也不要在回答里复述：\n` +
+            `${i18n.t('contextPreamble')}\n` +
               `${source}${described.label}：\n"""\n${described.text}\n"""`,
           )
           info.push(described.label)
@@ -853,11 +858,11 @@
           localController.signal,
         )
         if (!reply.content) {
-          reply.content = reply.reasoning ? '（只有思考过程，没有正文）' : '（没有返回内容）'
+          reply.content = reply.reasoning ? i18n.t('onlyThinking') : i18n.t('noContent')
         }
       } catch (error) {
         if (error?.name === 'AbortError') {
-          if (!reply.content) reply.content = '（已停止）'
+          if (!reply.content) reply.content = i18n.t('stopped')
         } else {
           setFailure(error?.message ?? String(error))
           if (!reply.content) {
@@ -1041,7 +1046,7 @@
       // Provider ---------------------------------------------------------------
       refs.settingsEl.appendChild(
         field(
-          '服务商',
+          i18n.t('provider'),
           selectControl(
             AICore.PROVIDERS.map((item) => ({ value: item.id, label: item.label })),
             settings.providerId,
@@ -1070,7 +1075,7 @@
       if (isCustom) {
         refs.settingsEl.appendChild(
           field(
-            '接口地址',
+            i18n.t('endpoint'),
             textControl(settings.baseUrl, (value) => {
               // Remember 自定义's own address as it is typed, so switching away and
               // back does not start from a blank field.
@@ -1082,7 +1087,7 @@
               refreshKeyFields()
               syncComposer()
             }, { type: 'url', placeholder: 'https://api.example.com/v1', 'data-field': 'base-url' }),
-            settings.baseUrl ? null : h('span', { class: 'apweb-warn-inline', text: '填上接口地址才能发送' }),
+            settings.baseUrl ? null : h('span', { class: 'apweb-warn-inline', text: i18n.t('endpointRequired') }),
           ),
         )
       }
@@ -1101,7 +1106,7 @@
       if (isCustom) modelInput.removeAttribute('list')
       refs.settingsEl.appendChild(
         h('label', { class: 'apweb-field' }, [
-          h('span', { text: '模型' }),
+          h('span', { text: i18n.t('modelLabel') }),
           modelInput,
           h(
             'datalist',
@@ -1114,7 +1119,7 @@
       // API key ----------------------------------------------------------------
       refs.keyHint = h('span', {
         class: 'apweb-hint-inline',
-        text: `这个 key 只用于 ${provider.label} · ${settings.model || '（未填模型）'}，换模型会自动换成对应的 key`,
+        text: i18n.t('keyHint', { provider: provider.label, model: settings.model || i18n.t('modelPlaceholder') }),
       })
       refs.settingsEl.appendChild(
         field(
@@ -1142,22 +1147,22 @@
             'data-field': 'include-page-text',
             on: { change: (event) => update({ includePageText: event.target.checked }) },
           }),
-          h('span', { text: '发送时附带页面内容' }),
+          h('span', { text: i18n.t('includePage') }),
         ]),
       )
       refs.settingsEl.appendChild(
         field(
-          '附带范围',
+          i18n.t('contextScope'),
           selectControl(
             [
-              { value: 'paragraph', label: '选中处所在的那一段（推荐）' },
-              { value: 'page', label: '整个页面正文' },
+              { value: 'paragraph', label: i18n.t('scopeParagraph') },
+              { value: 'page', label: i18n.t('scopePage') },
             ],
             settings.contextMode,
             (value) => update({ contextMode: value }),
             { 'data-field': 'context-mode' },
           ),
-          h('span', { class: 'apweb-hint-inline', text: '划词提问时只会在选中的是词或短句（不足 40 字）时附带。' }),
+          h('span', { class: 'apweb-hint-inline', text: i18n.t('scopeHint') }),
         ),
       )
 
@@ -1170,7 +1175,7 @@
           'data-field': 'thinking',
           on: { change: (event) => update({ thinking: event.target.checked }) },
         }),
-        h('span', { text: '使用思考模式（默认关闭）' }),
+        h('span', { text: i18n.t('useThinking') }),
       ])
       refs.thinkingNote = h('p', { class: 'apweb-note' })
       refs.settingsEl.appendChild(refs.thinkingRow)
@@ -1183,9 +1188,9 @@
       // than only when this form is rebuilt.
       refs.triggerSelect = selectControl(
         [
-          { value: 'off', label: '关闭（只选中，不发送）' },
-          { value: 'click', label: '选中后显示按钮，点击提问' },
-          { value: 'auto', label: '选中后自动提问' },
+          { value: 'off', label: i18n.t('triggerOff') },
+          { value: 'click', label: i18n.t('triggerClick') },
+          { value: 'auto', label: i18n.t('triggerAuto') },
         ],
         settings.selectionTrigger,
         (value) => update({ selectionTrigger: value }),
@@ -1193,11 +1198,11 @@
       )
       refs.settingsEl.appendChild(
         field(
-          '划词提问',
+          i18n.t('selectionTrigger'),
           refs.triggerSelect,
           h('span', {
             class: 'apweb-hint-inline',
-            text: '自动提问会在每次划选后立刻产生一次 API 调用；只想复制文字就用「关闭」。',
+            text: i18n.t('triggerHint'),
           }),
         ),
       )
@@ -1209,7 +1214,7 @@
       )
       refs.actionHint = h('span', { class: 'apweb-hint-inline' })
       refs.settingsEl.appendChild(
-        field('划词用途', refs.actionSelect, refs.actionHint),
+        field(i18n.t('selectionPurpose'), refs.actionSelect, refs.actionHint),
       )
       refreshSelectionFields()
 
@@ -1220,8 +1225,7 @@
         h('p', {
           class: 'apweb-note',
           text:
-            'key 只保存在本机浏览器（browser.storage.local），请求由浏览器直接发往上面的接口地址，' +
-            '不经过任何中转。共用电脑上记得清掉。',
+            i18n.t('keyStorageNote'),
         }),
       )
 
@@ -1229,13 +1233,13 @@
         h('button', {
           type: 'button',
           class: 'apweb-ghost',
-          text: '清除 key',
+          text: i18n.t('clearKey'),
           on: { click: () => update({ apiKey: '' }) },
         }),
         h('button', {
           type: 'button',
           class: 'apweb-primary',
-          text: '完成',
+          text: i18n.t('done'),
           on: { click: () => setShowSettings(false) },
         }),
       ])
@@ -1246,9 +1250,9 @@
 
     function buildPrompts() {
       const details = h('details', { class: 'apweb-prompts' }, [
-        h('summary', { text: '提示词' }),
-        buildPromptGroup('composer', '提问提示词（在输入框提问时使用）'),
-        buildPromptGroup('selection', '划词提示词（选中内容后使用）'),
+        h('summary', { text: i18n.t('prompts') }),
+        buildPromptGroup('composer', i18n.t('composerPrompts')),
+        buildPromptGroup('selection', i18n.t('selectionPrompts')),
       ])
       details.open = promptsOpen
       details.addEventListener('toggle', () => {
@@ -1294,7 +1298,7 @@
       const actions = h('div', { class: 'apweb-prompts__actions' }, [
         h('button', {
           type: 'button',
-          text: '+ 新建',
+          text: i18n.t('addPrompt'),
           'data-field': `${kind}-prompt-add`,
           on: {
             click: () => {
@@ -1305,7 +1309,7 @@
         }),
         h('button', {
           type: 'button',
-          text: '删除',
+          text: i18n.t('deletePrompt'),
           disabled: list.length <= 1,
           'data-field': `${kind}-prompt-delete`,
           on: {
@@ -1317,7 +1321,7 @@
         }),
         h('button', {
           type: 'button',
-          text: '恢复默认',
+          text: i18n.t('resetPrompts'),
           'data-field': `${kind}-prompt-reset`,
           on: {
             click: () => {
@@ -1337,8 +1341,7 @@
           ? h('p', {
               class: 'apweb-hint-inline',
               text:
-                '你写的内容会放在选中文字前面；系统一定会再补一句「只处理引号内的文字，不要翻译页面正文」，' +
-                '这条不能改——它是防止整页被翻译的保险。',
+                i18n.t('selectionPromptNote'),
             })
           : null,
       ])
@@ -1361,7 +1364,7 @@
       }
       if (!refs.keyHint) return
       const provider = AICore.providerById(settings.providerId)
-      refs.keyHint.textContent = `这个 key 只用于 ${provider.label} · ${settings.model || '（未填模型）'}，换模型会自动换成对应的 key`
+      refs.keyHint.textContent = i18n.t('keyHint', { provider: provider.label, model: settings.model || i18n.t('modelPlaceholder') })
     }
 
     function refreshThinking() {
@@ -1372,13 +1375,13 @@
       refs.thinkingNote.className = info.available ? 'apweb-note' : 'apweb-note apweb-note--plain'
       if (info.available) {
         refs.thinkingNote.textContent = info.canDisable
-          ? '默认关闭。打开后模型会先推理再回答，更准但更慢。'
-          : '这个模型只能强制思考，无法关闭（例如智谱 GLM-5.3）。'
+          ? i18n.t('thinkingOffNote')
+          : i18n.t('thinkingForcedNote')
       } else if (info.reason === 'model') {
         refs.thinkingNote.textContent =
-          '当前模型不接受思考开关，不会发送相关参数（例如 Kimi K3、GLM-4-Flash 这类非思考模型）。'
+          i18n.t('thinkingModelNote')
       } else {
-        refs.thinkingNote.textContent = '这个接口地址没有可用的思考开关，不会发送相关参数。'
+        refs.thinkingNote.textContent = i18n.t('thinkingNoControlNote')
       }
     }
 

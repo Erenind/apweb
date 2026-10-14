@@ -7,6 +7,9 @@ const ROOT = require('path').join(__dirname, '..')
 // --- stub the WebExtension storage API -------------------------------------
 const storage = {}
 globalThis.browser = {
+  // The panel follows the browser's UI language; the suite pins it to Chinese and
+  // exercises the English table explicitly.
+  i18n: { getUILanguage: () => 'zh-CN' },
   storage: {
     local: {
       async get(key) {
@@ -25,6 +28,7 @@ function load(rel) {
   vm.runInThisContext(code, { filename: rel })
 }
 
+load('src/shared/i18n.js')
 load('src/shared/ai.js')
 load('src/shared/store.js')
 load('src/shared/math.js')
@@ -32,6 +36,7 @@ load('src/shared/math.js')
 const AICore = globalThis.AICore
 const AIStore = globalThis.AIStore
 const AIMath = globalThis.AIMath
+const AII18n = globalThis.AII18n
 
 let failures = 0
 function check(name, cond) {
@@ -53,6 +58,40 @@ function eq(name, actual, expected) {
 }
 
 ;(async () => {
+  console.log('language')
+  eq('a Chinese browser is Chinese', AII18n.language('zh-CN'), 'zh')
+  eq('zh-Hans too', AII18n.language('zh-Hans'), 'zh')
+  eq('an English browser is English', AII18n.language('en-US'), 'en')
+  eq('anything else falls back to English', AII18n.language('fr-FR'), 'en')
+  eq('the UI strings follow it', AII18n.t('send'), 'Send')
+  check(
+    'every Chinese string has an English one',
+    Object.keys(AII18n.STRINGS.zh).every((key) => typeof AII18n.STRINGS.en[key] === 'string'),
+  )
+  check(
+    'and there are no English-only keys',
+    Object.keys(AII18n.STRINGS.en).every((key) => key in AII18n.STRINGS.zh),
+  )
+  eq(
+    'the two tables are the same size',
+    Object.keys(AII18n.STRINGS.en).length,
+    Object.keys(AII18n.STRINGS.zh).length,
+  )
+  // English browser: the shipped prompts are the English ones …
+  AIStore.updateSettings({ composerPrompts: [], selectionPrompts: [], composerPromptId: 'default' })
+  await AIStore.load()
+  check(
+    'an English browser gets English shipped prompts',
+    AIStore.state.settings.composerPrompts[0].text.includes('English'),
+  )
+  check(
+    'the selection prompts too',
+    AIStore.state.settings.selectionPrompts.some((prompt) => prompt.name === 'Translate only'),
+  )
+  // … and back to Chinese for the rest of the suite.
+  AII18n.language('zh-CN')
+  eq('and back to Chinese', AII18n.t('send'), '发送')
+
   console.log('AICore')
   eq('deepseek endpoint', AICore.providerById('deepseek').baseUrl, 'https://api.deepseek.com')
   eq('unknown provider -> custom', AICore.providerById('nope').id, 'custom')
@@ -326,6 +365,47 @@ function eq(name, actual, expected) {
     check('maths inside code spans stays literal', code.includes('$x$') && !code.includes('<math'))
     const bad = AIMarkdown.renderMarkdown('$\\frac{1}{$')
     check('broken TeX does not throw or inject HTML', typeof bad === 'string' && !/<script/i.test(bad))
+  }
+
+  console.log('repo invariants')
+  {
+    const path = require('path')
+    // Comments may name Chinese UI strings; only real code counts.
+    const stripComments = (text) =>
+      text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+    const files = []
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
+        const rel = `${dir}/${entry.name}`
+        if (entry.isDirectory()) walk(rel)
+        else if (entry.name.endsWith('.js') && rel !== 'src/shared/i18n.js') files.push(rel)
+      }
+    }
+    walk('src')
+    eq(
+      'no user-facing string lives outside the i18n table',
+      files.filter((rel) =>
+        /[\u4e00-\u9fff]/.test(stripComments(fs.readFileSync(`${ROOT}/${rel}`, 'utf8'))),
+      ),
+      [],
+    )
+
+    const manifest = JSON.parse(fs.readFileSync(`${ROOT}/manifest.json`, 'utf8'))
+    const loadsFirst = (list) => {
+      const i18nAt = list.indexOf('src/shared/i18n.js')
+      if (i18nAt === -1) return false
+      return list.every(
+        (file, index) =>
+          !/shared\/(ai|store|markdown)\.js$/.test(file) || index === i18nAt || i18nAt < index,
+      )
+    }
+    check('i18n loads before ai.js/store.js in the content script', loadsFirst(manifest.content_scripts[0].js))
+    check('…and in the background page', loadsFirst(manifest.background.scripts))
+    const optionsHtml = fs.readFileSync(`${ROOT}/src/options/options.html`, 'utf8')
+    check(
+      '…and in the options page',
+      optionsHtml.indexOf('shared/i18n.js') < optionsHtml.indexOf('shared/ai.js'),
+    )
   }
 
   console.log(failures ? `\n${failures} FAILURE(S)` : '\nall checks passed')
