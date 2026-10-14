@@ -1,28 +1,19 @@
-<div align="center"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- Same family as the reader's icon: a rounded-rect badge holding a
-       speech bubble whose tail flows out of the bottom-left corner with a
-       rounded tip (no sharp angles anywhere). The sparkle inside marks it as
-       the AI assistant rather than the document. -->
-  <rect width="64" height="64" rx="16" fill="#00BD7E"/>
-  <path
-    d="M24.5 12H39.5A6.5 6.5 0 0 1 46 18.5V35.5A6.5 6.5 0 0 1 39.5 42H28C26.9 45.4 24.9 48.2 22.1 50.1A2.5 2.5 0 0 1 19.7 48.6C18.6 45.9 18 43.1 18 40V18.5A6.5 6.5 0 0 1 24.5 12Z"
-    fill="#FFFFFF"
-  />
-  <path
-    d="M33 19 L35.04 25.96 L42 28 L35.04 30.04 L33 37 L30.96 30.04 L24 28 L30.96 25.96 Z"
-    fill="#08301F"
-    stroke="#08301F"
-    stroke-width="3"
-    stroke-linejoin="round"
-  />
-</svg>
-<!-- <img width="64" height="64" alt="icon" src="https://github.com/user-attachments/assets/7d54f34d-f47e-4b77-a12c-b07e66b1e8d4" /> -->
+<div align="center">
+  <img width="64" height="64" alt="icon" src="https://github.com/user-attachments/assets/7d54f34d-f47e-4b77-a12c-b07e66b1e8d4" />
 </div>
 
 
 
 <h3 align="center">网页 AI 助手</h3>
 <h3 align="center">让AI立即解答你的所有疑惑</h3>
+<div align="center">
+  <img alt="GitHub repo size" src="https://img.shields.io/github/repo-size/erenind/apweb">
+  <img alt="GitHub language count" src="https://img.shields.io/github/languages/count/erenind/apweb">
+  <img alt="GitHub top language" src="https://img.shields.io/github/languages/top/erenind/apweb">
+  <img alt="GitHub Created At" src="https://img.shields.io/github/created-at/erenind/apweb">
+  <img alt="GitHub forks" src="https://img.shields.io/github/forks/erenind/apweb">
+  <img alt="GitHub Repo stars" src="https://img.shields.io/github/stars/erenind/apweb">
+</div>
 video/gifs
 ---
 
