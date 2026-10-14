@@ -368,6 +368,9 @@
         refs.actionHint = null
         refs.keyInput = null
         refs.keyHint = null
+        refs.temperatureRow = null
+        refs.temperatureInput = null
+        refs.temperatureNote = null
       }
       syncComposer()
     }
@@ -839,24 +842,39 @@
 
       try {
         const settings = S()
-        await streamOnce(
-          {
-            baseUrl: settings.baseUrl,
-            apiKey: settings.apiKey,
-            model: settings.model,
-            // Undefined for models that only accept one temperature, so the field
-            // is left out of the request instead of being a 400.
-            temperature: AICore.effectiveTemperature(settings),
-            messages: payload,
-            settings,
-          },
-          (kind, text) => {
-            if (kind === 'reasoning') reply.reasoning = (reply.reasoning ?? '') + text
-            else reply.content += text
-            scheduleUpdate(reply)
-          },
-          localController.signal,
-        )
+        const request = {
+          baseUrl: settings.baseUrl,
+          apiKey: settings.apiKey,
+          model: settings.model,
+          // Undefined for models that only accept one temperature, so the field
+          // is left out of the request instead of being a 400.
+          temperature: AICore.effectiveTemperature(settings),
+          messages: payload,
+          settings,
+        }
+        const onDelta = (kind, text) => {
+          if (kind === 'reasoning') reply.reasoning = (reply.reasoning ?? '') + text
+          else reply.content += text
+          scheduleUpdate(reply)
+        }
+
+        try {
+          await streamOnce(request, onDelta, localController.signal)
+        } catch (error) {
+          // An endpoint that will not take a temperature says so in the error;
+          // no table can know every relay's models, so notice it, remember it for
+          // this endpoint+model and retry once without the field. Safe to retry:
+          // a rejected request never streamed anything.
+          const retryable =
+            request.temperature !== undefined &&
+            !localController.signal.aborted &&
+            AICore.isTemperatureRejection(error?.message)
+          if (!retryable) throw error
+          update({
+            temperatureOffSlots: { ...S().temperatureOffSlots, [AICore.pairSlot(settings)]: true },
+          })
+          await streamOnce({ ...request, temperature: undefined }, onDelta, localController.signal)
+        }
         if (!reply.content) {
           reply.content = reply.reasoning ? i18n.t('onlyThinking') : i18n.t('noContent')
         }
@@ -1182,6 +1200,49 @@
       refs.settingsEl.appendChild(refs.thinkingNote)
       refreshThinking()
 
+      // Temperature ------------------------------------------------------------
+      // A switch, plus the value: some endpoints reject the field outright
+      // ("temperature is deprecated for this model") and no built-in table can
+      // know every relay's quirks, so it has to be controllable by hand.
+      refs.temperatureRow = h('label', { class: 'apweb-check' }, [
+        h('input', {
+          class: 'apweb-switch',
+          type: 'checkbox',
+          checked: settings.sendTemperature !== false,
+          'data-field': 'send-temperature',
+          on: {
+            change: (event) => {
+              update({ sendTemperature: event.target.checked })
+              refreshTemperature()
+            },
+          },
+        }),
+        h('span', { text: i18n.t('sendTemperature') }),
+      ])
+      refs.temperatureInput = h('input', {
+        type: 'number',
+        min: '0',
+        max: '2',
+        step: '0.1',
+        value: String(settings.temperature ?? ''),
+        'data-field': 'temperature',
+        on: {
+          input: (event) => {
+            const value = Number(event.target.value)
+            // An empty or half-typed box must not silently become 0 (or NaN).
+            if (event.target.value.trim() !== '' && Number.isFinite(value)) {
+              update({ temperature: Math.min(Math.max(value, 0), 2) })
+            }
+          },
+        },
+      })
+      refs.temperatureNote = h('p', { class: 'apweb-note' })
+      refs.settingsEl.appendChild(refs.temperatureRow)
+      refs.settingsEl.appendChild(
+        field(i18n.t('temperatureValue'), refs.temperatureInput, refs.temperatureNote),
+      )
+      refreshTemperature()
+
       // Selection behaviour ----------------------------------------------------
       // These two selects mirror the same settings the prominent toggle above
       // edits, so they are refreshed in place (see refreshSelectionFields) rather
@@ -1385,6 +1446,27 @@
       }
     }
 
+    /**
+     * Keep the temperature switch, its value box and its note in step — including
+     * after the app quietly marked this endpoint+model as "no temperature".
+     */
+    function refreshTemperature() {
+      const settings = S()
+      const on = settings.sendTemperature !== false
+      if (refs.temperatureInput) {
+        refs.temperatureInput.disabled = !on
+        const value = String(settings.temperature ?? '')
+        if (refs.temperatureInput.value !== value) refs.temperatureInput.value = value
+      }
+      if (!refs.temperatureNote) return
+      const skipped = Boolean(settings.temperatureOffSlots?.[AICore.pairSlot(settings)])
+      refs.temperatureNote.textContent = !on
+        ? i18n.t('temperatureOffNote')
+        : skipped
+          ? i18n.t('temperatureSkippedNote')
+          : i18n.t('temperatureOnNote')
+    }
+
     /* ---------------------------------- drag ---------------------------------- */
 
     /**
@@ -1479,6 +1561,7 @@
       refreshModeControl()
       refreshSelectionFields()
       refreshKeyFields()
+      refreshTemperature()
       syncComposer()
       // A change that came from another surface (options page / another tab) has
       // to be reflected in the transcript too.

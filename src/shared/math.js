@@ -23,6 +23,16 @@
     { open: '$', close: '$', display: false },
   ]
 
+  // Models rarely stick to `$…$`: they wrap LaTeX in a fenced block tagged
+  // `latex`/`math`, or write a bare `\begin{align}`. Both are maths, and treating
+  // them as code (or as text) is what made formulas come out unrendered.
+  const MATH_FENCE_LANGUAGES = new Set(['math', 'latex', 'tex', 'katex', 'amsmath', 'equation'])
+  const MATH_ENVIRONMENTS = new Set([
+    'equation', 'equation*', 'align', 'align*', 'aligned', 'gather', 'gather*',
+    'multline', 'multline*', 'split', 'cases', 'matrix', 'pmatrix', 'bmatrix',
+    'Bmatrix', 'vmatrix', 'Vmatrix', 'array',
+  ])
+
   function isEscaped(text, index) {
     let backslashes = 0
     for (let i = index - 1; i >= 0 && text[i] === '\\'; i -= 1) backslashes += 1
@@ -63,6 +73,22 @@
     return null
   }
 
+  /** A bare `\begin{env}…\end{env}` block, which needs no delimiters. */
+  function matchEnvironment(text, index) {
+    if (text[index] !== '\\' || isEscaped(text, index)) return null
+    const begin = /^\\begin\{([\w*]+)\}/.exec(text.slice(index))
+    if (!begin || !MATH_ENVIRONMENTS.has(begin[1])) return null
+    const closing = `\\end{${begin[1]}}`
+    const end = text.indexOf(closing, index + begin[0].length)
+    if (end === -1) return null
+    return {
+      tex: text.slice(index, end + closing.length),
+      display: true,
+      start: index,
+      end: end + closing.length,
+    }
+  }
+
   /**
    * Replace every maths span with an inert token.
    * Returns `{ text, items }`, where each item carries the LaTeX and whether it
@@ -84,6 +110,22 @@
           const marks = fence[0]
           const found = text.indexOf(`\n${marks}`, i + marks.length)
           const stop = found === -1 ? text.length : found + 1 + marks.length
+          // …unless the info string says the block *is* maths.
+          const infoEnd = text.indexOf('\n', i + marks.length)
+          const info = text.slice(i + marks.length, infoEnd === -1 ? text.length : infoEnd).trim()
+          if (MATH_FENCE_LANGUAGES.has(info.toLowerCase())) {
+            const body = text
+              .slice(infoEnd === -1 ? text.length : infoEnd + 1, found === -1 ? text.length : found)
+              .trim()
+            if (body) {
+              out += token(items.length)
+              items.push({ tex: body, display: true, start: i, end: stop })
+            } else {
+              out += text.slice(i, stop)
+            }
+            i = stop
+            continue
+          }
           out += text.slice(i, stop)
           i = stop
           continue
@@ -105,6 +147,14 @@
         out += token(items.length)
         items.push(math)
         i = math.end
+        continue
+      }
+
+      const environment = matchEnvironment(text, i)
+      if (environment) {
+        out += token(items.length)
+        items.push(environment)
+        i = environment.end
         continue
       }
 

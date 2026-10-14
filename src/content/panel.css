@@ -1,3 +1,7 @@
+/* KaTeX's own stylesheet, so rendered formulas use its HTML layout and web fonts
+   (the @import path is relative to this file; the fonts sit next to it). */
+@import url('../../vendor/katex.min.css');
+
 /* Styles for the assistant panel. Loaded inside a ShadowRoot on real pages and
    as a plain stylesheet on the options page, so everything is scoped under
    `.apweb-scope` instead of relying on `:host` or document-wide resets. */
@@ -406,12 +410,9 @@
   border-top: 1px solid var(--ap-border);
 }
 
-/* KaTeX is vendored in its MathML-only build, so there is no KaTeX stylesheet to
-   load — Firefox lays the maths out itself. Display maths only needs breathing
-   room and a way to scroll a formula that is wider than the panel. */
-.apweb-msg__body--md .katex math[display='block'] {
-  display: block;
-  margin: 8px 0;
+/* KaTeX styles the formulas; the panel only has to give a wide display formula
+   somewhere to scroll instead of stretching the message column. */
+.apweb-msg__body--md .katex-display {
   overflow-x: auto;
   overflow-y: hidden;
 }

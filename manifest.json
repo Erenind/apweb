@@ -62,6 +62,10 @@
     {
       "resources": ["src/content/panel.css", "icons/icon.svg"],
       "matches": ["<all_urls>"]
+    },
+    {
+      "resources": ["vendor/katex.min.css", "vendor/fonts/*"],
+      "matches": ["<all_urls>"]
     }
   ]
 }

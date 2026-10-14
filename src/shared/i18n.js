@@ -102,6 +102,13 @@
       thinkingModelNote:
         '当前模型不接受思考开关，不会发送相关参数（例如 Kimi K3、GLM-4-Flash 这类非思考模型）。',
       thinkingNoControlNote: '这个接口地址没有可用的思考开关，不会发送相关参数。',
+      // Temperature ------------------------------------------------------------
+      sendTemperature: '发送 temperature 参数',
+      temperatureValue: 'temperature 值',
+      temperatureOnNote: '发送时带上这个值（默认 0.3）。接口返回「temperature 被拒绝」时会自动重试一次并记住。',
+      temperatureOffNote: '不发送 temperature，由服务端用它自己的默认值。',
+      temperatureSkippedNote:
+        '这个接口 + 模型之前拒绝了 temperature，已自动跳过（重新打开上面的开关可以强行发送）。',
       // Selection behaviour ----------------------------------------------------
       selectionTrigger: '划词提问',
       triggerOff: '关闭（只选中，不发送）',
@@ -219,6 +226,13 @@
       thinkingModelNote:
         'This model takes no thinking switch, so none is sent (e.g. Kimi K3, GLM-4-Flash).',
       thinkingNoControlNote: 'This endpoint has no thinking switch, so none is sent.',
+      sendTemperature: 'Send a temperature parameter',
+      temperatureValue: 'Temperature value',
+      temperatureOnNote:
+        'Sent with this value (0.3 by default). If the endpoint rejects it, the request is retried once and remembered.',
+      temperatureOffNote: 'No temperature is sent; the service uses its own default.',
+      temperatureSkippedNote:
+        'This endpoint + model rejected temperature earlier, so it is skipped (turn the switch above back on to force it).',
       selectionTrigger: 'Ask on select',
       triggerOff: 'Off (selecting does nothing)',
       triggerClick: 'Show a button next to the selection',

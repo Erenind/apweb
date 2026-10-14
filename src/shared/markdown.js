@@ -9,8 +9,8 @@
 // answer, and would be a tracking pixel the page controls).
 //
 // LaTeX maths is handled around the sanitiser: `AIMath` swaps the formulas for
-// inert tokens first and KaTeX renders them back to MathML afterwards, so
-// DOMPurify keeps its strict allow-list while formulas still come out typeset.
+// inert tokens first and KaTeX renders them back afterwards, so DOMPurify keeps
+// its strict allow-list while formulas still come out typeset.
 (function () {
   'use strict'
 
@@ -43,18 +43,25 @@
   }
 
   /**
-   * One formula as HTML. KaTeX escapes the LaTeX it is given and leaves \href,
-   * \url and the \html… commands inert unless `trust` is enabled — this stays on
-   * the defaults, so the result is safe to inject. Bad LaTeX renders as a red
-   * KaTeX error span instead of throwing; if KaTeX is missing altogether the raw
-   * formula is shown, escaped.
+   * One formula as HTML.
+   *
+   * `htmlAndMathml` (KaTeX's default) is the pair you want: the HTML half is what
+   * you actually see — KaTeX's own stylesheet and fonts, so it is typeset like
+   * the reference rendering — and the MathML half is hidden by that stylesheet
+   * but still readable by screen readers. MathML alone, which is what this used
+   * to emit, has no styling of its own and comes out small and plain.
+   *
+   * KaTeX escapes the LaTeX it is given and leaves \href, \url and the \html…
+   * commands inert unless `trust` is enabled — this stays on the defaults, so the
+   * result is safe to inject. Bad LaTeX renders as a red KaTeX error span instead
+   * of throwing; if KaTeX is missing altogether the raw formula is shown, escaped.
    */
   function renderMath(item) {
     if (!katex?.renderToString) return escapeHtml(item.display ? `$$${item.tex}$$` : `$${item.tex}$`)
     const tex = item.tex.length > MAX_TEX_LENGTH ? item.tex.slice(0, MAX_TEX_LENGTH) : item.tex
     try {
       return katex.renderToString(tex, {
-        output: 'mathml',
+        output: 'htmlAndMathml',
         displayMode: item.display,
         throwOnError: false,
         trust: false,

@@ -144,6 +144,14 @@
     const customBaseUrl = typeof merged.customBaseUrl === 'string' ? merged.customBaseUrl : ''
     const customModel = typeof merged.customModel === 'string' ? merged.customModel : ''
 
+    // Request-shape preferences: the temperature switch, and the pairs that
+    // turned out to reject a temperature (only true values are kept).
+    const sendTemperature = merged.sendTemperature !== false
+    const temperatureOffSlots = {}
+    for (const [slot, off] of Object.entries(merged.temperatureOffSlots ?? {})) {
+      if (off === true) temperatureOffSlots[slot] = true
+    }
+
     // The panel's last geometry, kept only if it is complete — a half-written
     // record would place the panel at NaN.
     const storedRect = merged.panelRect
@@ -167,6 +175,8 @@
       thinkingByProvider,
       thinking: thinkingByProvider[merged.providerId] ?? false,
       contextMode,
+      sendTemperature,
+      temperatureOffSlots,
       customBaseUrl,
       customModel,
       panelRect,
@@ -261,7 +271,29 @@
   })
 
   function saveSettings() {
-    return write(SETTINGS_KEY, { ...state.settings })
+    return write(SETTINGS_KEY, snapshotSettings())
+  }
+
+  /**
+   * A deep-enough copy of the settings to hand to storage.
+   *
+   * A shallow `{ ...settings }` shares its nested containers with the live state,
+   * so a later edit mutates the object we already "wrote" — which changes what it
+   * serialises to and breaks the echo check (the write would come back looking
+   * like someone else's change and could revert settings). Copying the containers
+   * makes the payload a true snapshot, exactly like the browser's own clone.
+   */
+  function snapshotSettings() {
+    const settings = state.settings
+    return {
+      ...settings,
+      apiKeys: { ...settings.apiKeys },
+      thinkingByProvider: { ...settings.thinkingByProvider },
+      temperatureOffSlots: { ...settings.temperatureOffSlots },
+      panelRect: settings.panelRect ? { ...settings.panelRect } : null,
+      composerPrompts: settings.composerPrompts.map((prompt) => ({ ...prompt })),
+      selectionPrompts: settings.selectionPrompts.map((prompt) => ({ ...prompt })),
+    }
   }
 
   function saveMessages() {

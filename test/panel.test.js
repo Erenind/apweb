@@ -364,6 +364,13 @@ function makePort(name) {
     postMessage(m) {
       port.received.push(m)
       if (m.t === 'chat') {
+        // A relay that rejects `temperature` answers 400 before streaming; the
+        // panel is expected to retry once without the field.
+        if (rejectTemperatureOnce && m.request?.temperature !== undefined) {
+          rejectTemperatureOnce = false
+          setTimeout(() => port.emit({ t: 'error', id: m.id, message: 'temperature is deprecated for this model' }), 0)
+          return
+        }
         setTimeout(() => {
           port.emit({ t: 'delta', id: m.id, kind: 'content', text: '你好' })
           port.emit({ t: 'delta', id: m.id, kind: 'content', text: '，世界' })
@@ -389,14 +396,23 @@ globalThis.browser = {
     },
     local: {
       async get(key) {
-        return key == null ? { ...storage } : { [key]: storage[key] }
+        // A real browser hands back a fresh clone, never the live object.
+        const clone = (value) => JSON.parse(JSON.stringify(value ?? null))
+        return key == null
+          ? Object.fromEntries(Object.entries(storage).map(([k, v]) => [k, clone(v)]))
+          : { [key]: storage[key] === undefined ? undefined : clone(storage[key]) }
       },
       async set(obj) {
-        Object.assign(storage, obj)
         // A real browser fires onChanged in every context, including the one
         // that wrote — this is what exercises the store's echo suppression.
         const changes = {}
-        for (const key of Object.keys(obj)) changes[key] = { newValue: obj[key] }
+        for (const key of Object.keys(obj)) {
+          // storage.local structured-clones on write: the snapshot is frozen, so
+          // mutating the live object afterwards must not change it.
+          const cloned = JSON.parse(JSON.stringify(obj[key] ?? null))
+          storage[key] = cloned
+          changes[key] = { newValue: cloned }
+        }
         setTimeout(() => {
           for (const fn of storageListeners) fn(changes, 'local')
         }, 0)
@@ -421,6 +437,8 @@ globalThis.browser = {
 
 // What the background would hold for "is the floating panel showing in this tab".
 let tabPanelOpen = false
+// Set by a test that wants the next chat request to fail on `temperature` once.
+let rejectTemperatureOnce = false
 
 function dispatchToContent(message) {
   for (const fn of [...contentMessageListeners]) fn(message)
@@ -437,8 +455,9 @@ function lastChatRequest() {
 
 /** Simulate another surface (options page / another tab) writing storage. */
 function remoteWrite(key, value) {
-  storage[key] = value
-  for (const fn of storageListeners) fn({ [key]: { newValue: value } }, 'local')
+  const cloned = JSON.parse(JSON.stringify(value ?? null))
+  storage[key] = cloned
+  for (const fn of storageListeners) fn({ [key]: { newValue: cloned } }, 'local')
 }
 
 // DOMPurify/marked can't run on the mini DOM, so the sanitised-markdown layer is
@@ -974,6 +993,86 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   await tick()
   await tick()
   check('a range-taking Moonshot model gets our temperature', lastChatRequest()?.temperature === 0.3)
+
+  console.log('temperature setting')
+  const sendTemperature = settingsEl
+    .querySelectorAll('input')
+    .find((i) => i.getAttribute('data-field') === 'send-temperature')
+  const temperatureValue = settingsEl
+    .querySelectorAll('input')
+    .find((i) => i.getAttribute('data-field') === 'temperature')
+  check('the form exposes a temperature switch and value', !!sendTemperature && !!temperatureValue)
+  check('it starts on', AIStore.state.settings.sendTemperature !== false)
+
+  sendTemperature.checked = false
+  sendTemperature.dispatch('change', { target: sendTemperature })
+  check('turning it off is remembered', AIStore.state.settings.sendTemperature === false)
+  check('and greys out the value box', temperatureValue.disabled === true)
+
+  AIStore.updateSettings({ providerId: 'custom', baseUrl: 'https://plain.example/v1', model: 'm1', apiKey: 'k' })
+  const beforeOff = ports.length
+  textarea.value = '不带温度'
+  textarea.dispatch('input', { target: textarea })
+  textarea.dispatch('keydown', { key: 'Enter', shiftKey: false, isComposing: false, target: textarea })
+  await tick()
+  await tick()
+  const offRequest = ports
+    .slice(beforeOff)
+    .map((port) => port.received.find((m) => m.t === 'chat')?.request)
+    .filter(Boolean)[0]
+  check('the request goes out with no temperature field', offRequest && offRequest.temperature === undefined)
+
+  sendTemperature.checked = true
+  sendTemperature.dispatch('change', { target: sendTemperature })
+  check('turning it back on is remembered', AIStore.state.settings.sendTemperature === true)
+  temperatureValue.value = '0.8'
+  temperatureValue.dispatch('input', { target: temperatureValue })
+  check('the value box edits the setting', AIStore.state.settings.temperature === 0.8)
+  temperatureValue.value = '9'
+  temperatureValue.dispatch('input', { target: temperatureValue })
+  check('the value is clamped to the allowed range', AIStore.state.settings.temperature === 2)
+
+  console.log('a relay that rejects temperature')
+  AIStore.updateSettings({
+    providerId: 'custom',
+    baseUrl: 'https://modelsell.cc/v1',
+    model: 'claude-fable-5',
+    apiKey: 'sk-x',
+    temperature: 0.3,
+  })
+  rejectTemperatureOnce = true
+  const beforeRetry = ports.length
+  const answersBefore = AIStore.state.messages.length
+  textarea.value = '温度被拒绝'
+  textarea.dispatch('input', { target: textarea })
+  textarea.dispatch('keydown', { key: 'Enter', shiftKey: false, isComposing: false, target: textarea })
+  await tick()
+  await tick()
+  const attempts = ports
+    .slice(beforeRetry)
+    .map((port) => port.received.find((m) => m.t === 'chat')?.request)
+    .filter(Boolean)
+  check('the first attempt sent the temperature', attempts[0]?.temperature === 0.3)
+  check('the retry left it out', attempts.length === 2 && attempts[1].temperature === undefined)
+  check('and the answer still arrives', AIStore.state.messages.at(-1).content === '你好，世界')
+  check(
+    'the endpoint+model is remembered as no-temperature',
+    AIStore.state.settings.temperatureOffSlots['https://modelsell.cc/v1|claude-fable-5'] === true,
+  )
+  check('the note says so', !AIStore.state.settings.sendTemperature === false)
+
+  const beforeNext = ports.length
+  textarea.value = '再问一次'
+  textarea.dispatch('input', { target: textarea })
+  textarea.dispatch('keydown', { key: 'Enter', shiftKey: false, isComposing: false, target: textarea })
+  await tick()
+  await tick()
+  const nextRequest = ports
+    .slice(beforeNext)
+    .map((port) => port.received.find((m) => m.t === 'chat')?.request)
+    .filter(Boolean)[0]
+  check('later turns skip the field from the start', nextRequest && nextRequest.temperature === undefined)
+  check('the transcript kept the earlier turns', AIStore.state.messages.length > answersBefore)
 
   console.log(failures ? `\n${failures} FAILURE(S)` : '\nall checks passed')
   process.exit(failures ? 1 : 0)

@@ -166,6 +166,55 @@ function eq(name, actual, expected) {
     'a non-numeric temperature is dropped rather than sent as NaN',
     AICore.effectiveTemperature({ providerId: 'deepseek', model: 'x', temperature: 'warm' }) === undefined,
   )
+  eq(
+    'the switch turns the field off for every model',
+    AICore.effectiveTemperature({
+      providerId: 'deepseek',
+      model: 'deepseek-flash',
+      temperature: 0.3,
+      sendTemperature: false,
+    }),
+    undefined,
+  )
+  eq(
+    'a pair that rejected it once stays off',
+    AICore.effectiveTemperature({
+      providerId: 'custom',
+      baseUrl: 'https://modelsell.cc/v1',
+      model: 'claude-fable-5',
+      temperature: 0.3,
+      temperatureOffSlots: { 'https://modelsell.cc/v1|claude-fable-5': true },
+    }),
+    undefined,
+  )
+  eq(
+    'other pairs are unaffected by that memory',
+    AICore.effectiveTemperature({
+      providerId: 'custom',
+      baseUrl: 'https://modelsell.cc/v1',
+      model: 'another-model',
+      temperature: 0.3,
+      temperatureOffSlots: { 'https://modelsell.cc/v1|claude-fable-5': true },
+    }),
+    0.3,
+  )
+  check(
+    'the reported rejection is recognised',
+    AICore.isTemperatureRejection('temperature is deprecated for this model.') &&
+      AICore.isTemperatureRejection('invalid temperature: only 0.6 is allowed for this model') &&
+      AICore.isTemperatureRejection('Unsupported value: temperature does not support 0.3 with this model'),
+  )
+  check(
+    'unrelated errors are not mistaken for it',
+    !AICore.isTemperatureRejection('API key is invalid') &&
+      !AICore.isTemperatureRejection('model not found') &&
+      !AICore.isTemperatureRejection(''),
+  )
+  eq(
+    'the pair key matches the api-key slot',
+    AICore.pairSlot({ baseUrl: 'https://a.com/', model: ' m ' }),
+    AICore.apiKeySlot({ baseUrl: 'https://a.com/', model: ' m ' }),
+  )
 
   console.log('LaTeX extraction')
   {
@@ -201,6 +250,36 @@ function eq(name, actual, expected) {
   eq('fenced code keeps its dollars', AIMath.maskMath('```\n$x^2$\n```').items.length, 0)
   eq('inline code keeps its dollars', AIMath.maskMath('use `$x$` here').items.length, 0)
   eq('multi-line display maths works', AIMath.maskMath('$$\na+b\n$$').items.length, 1)
+  eq(
+    'a ```latex fence is maths, not code',
+    AIMath.maskMath('```latex\nE = mc^2\n```').items.map((i) => [i.tex, i.display]),
+    [['E = mc^2', true]],
+  )
+  eq(
+    'a ```math fence too',
+    AIMath.maskMath('```math\n\\frac{a}{b}\n```').items[0]?.tex,
+    '\\frac{a}{b}',
+  )
+  eq(
+    'a plain code fence is still code',
+    AIMath.maskMath('```js\nconst a = 1\n```').items.length,
+    0,
+  )
+  eq(
+    'a bare align environment is maths',
+    AIMath.maskMath('\\begin{align}\na &= b + c \\\\\nd &= e\n\\end{align}').items[0]?.display,
+    true,
+  )
+  eq(
+    'a bare cases environment too',
+    AIMath.maskMath('\\begin{cases} x & x > 0 \\\\ 0 & x \\le 0 \\end{cases}').items.length,
+    1,
+  )
+  eq(
+    'an unknown environment is left alone',
+    AIMath.maskMath('\\begin{tikzpicture} x \\end{tikzpicture}').items.length,
+    0,
+  )
   eq(
     'a replacement containing $ is inserted literally',
     AIMath.unmaskMath('x apwebmathtoken0 y', [{ tex: 'a$b', display: false }], () => '<i>$&</i>'),
@@ -358,6 +437,10 @@ function eq(name, actual, expected) {
     const html = AIMarkdown.renderMarkdown('能量是 $E=mc^2$。\n\n$$\\frac{1}{2}$$')
     check('inline maths renders as MathML', html.includes('<math') && html.includes('<msup>'))
     check('display maths is block level', html.includes('display="block"'))
+    // What you actually see is KaTeX's HTML half (its CSS + web fonts); the MathML
+    // half is the hidden copy screen readers use.
+    check('the visible half is KaTeX HTML', html.includes('katex-html'))
+    check('a MathML copy is kept for screen readers', html.includes('katex-mathml'))
     check('no placeholder leaks into the output', !html.includes('apwebmathtoken'))
     check('the surrounding markdown still renders', html.includes('<p>'))
     check('the TeX source is kept for screen readers', html.includes('application/x-tex'))

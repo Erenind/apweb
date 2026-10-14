@@ -73,6 +73,15 @@
     thinking: false,
     // Remembered per provider, so switching between them keeps each preference.
     thinkingByProvider: {},
+    // Whether to send `temperature` at all, and its value. Some models reject the
+    // field outright ("temperature is deprecated for this model"), and that is a
+    // per-endpoint quirk no table can keep up with — hence a switch.
+    sendTemperature: true,
+    temperature: 0.3,
+    // Endpoint+model pairs that turned out not to take a temperature. Filled in
+    // automatically when a request comes back as a temperature rejection, so the
+    // retry sticks for that model instead of failing again next time.
+    temperatureOffSlots: {},
     // What a text selection does. The reader auto-sent on every selection;
     // on the open web that would fire a request every time you copy a line, so
     // the default here is to show a small button and only ask when it is
@@ -95,7 +104,6 @@
       shippedPrompt('translate', 'translateName', 'translateText'),
       shippedPrompt('explain', 'explainName', 'explainText'),
     ],
-    temperature: 0.3,
   }
 
   // The scope has to be spelled out in the request itself: the page text we
@@ -254,11 +262,36 @@
   }
 
   /**
-   * The temperature to actually send: the configured value, or `undefined` to
-   * omit the field for a model that only accepts one value.
+   * Endpoint + model: the identity of one "pair". Used for per-pair keys, and for
+   * remembering which pairs turned out not to take a temperature.
+   */
+  function pairSlot(settings) {
+    return apiKeySlot(settings)
+  }
+
+  /**
+   * Does this error mean the endpoint will not take a `temperature` at all?
+   * Relays invent model names and change their minds ("temperature is deprecated
+   * for this model", "invalid temperature: only 0.6 is allowed"), so the only
+   * robust answer is to notice the rejection and stop sending the field.
+   */
+  function isTemperatureRejection(message) {
+    const text = String(message ?? '')
+    if (!/temperature/i.test(text)) return false
+    return /(deprecated|unsupported|not supported|does not support|only .* allowed|invalid)/i.test(
+      text,
+    )
+  }
+
+  /**
+   * The temperature to actually send, or `undefined` to leave the field out:
+   * the user turned it off, the model fixes its own, or this pair rejected it
+   * before and was remembered.
    */
   function effectiveTemperature(settings) {
+    if (settings.sendTemperature === false) return undefined
     if (temperatureIsFixed(settings)) return undefined
+    if (settings.temperatureOffSlots?.[pairSlot(settings)]) return undefined
     const value = Number(settings.temperature)
     return Number.isFinite(value) ? value : undefined
   }
@@ -414,6 +447,8 @@
     temperatureControl,
     temperatureIsFixed,
     effectiveTemperature,
+    pairSlot,
+    isTemperatureRejection,
     apiKeySlot,
     streamChat,
   }
