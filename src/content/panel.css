@@ -717,6 +717,14 @@
   color: var(--ap-text-soft);
 }
 
+/* A group heading inside the settings form (the Android-only settings). */
+.apweb-settings__section {
+  margin: 4.8px 0 -2.4px;
+  font-size: 12.16px;
+  font-weight: 700;
+  color: var(--ap-text-soft);
+}
+
 .apweb-note--plain {
   padding: 0 1.6px;
   background: transparent;
@@ -895,8 +903,12 @@
   min-width: 0;
   min-height: 0;
   /* Grows upward with the answer, but never past the top of the page; the
-     transcript is what scrolls once it is full. */
-  max-height: calc(100vh - var(--ap-dock-bottom) - var(--ap-dock-edge));
+     transcript is what scrolls once it is full. `--ap-card-max` is the height
+     picked in the Android settings, which may not win against a short screen. */
+  max-height: min(
+    var(--ap-card-max, 100vh),
+    calc(100vh - var(--ap-dock-bottom) - var(--ap-dock-edge))
+  );
   border-radius: 16px;
 }
 
@@ -904,6 +916,12 @@
 .apweb-scope--mobile .apweb-panel__head {
   cursor: default;
   touch-action: auto;
+}
+
+/* Answers only: the Android setting hides what you sent. A class rather than a
+   re-render, so flipping the switch changes the card in place. */
+.apweb-scope--mobile .apweb-panel--answers-only .apweb-msg--user {
+  display: none;
 }
 
 /* The corner controls: bottom-right, close button above the switch. */
@@ -933,6 +951,10 @@
   line-height: 1;
   box-shadow: var(--ap-shadow);
   cursor: pointer;
+  /* Holding the switch opens the card, so the browser must not start a text
+     selection (or its own long-press menu) first. */
+  user-select: none;
+  -webkit-user-select: none;
   /* A tap target that neither flashes grey nor zooms the page. */
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;

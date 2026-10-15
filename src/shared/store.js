@@ -25,7 +25,7 @@
   // history from a mode you have since switched away from out of the request.
   const MESSAGE_FIELDS = ['role', 'content', 'forModel', 'context', 'reasoning', 'action']
 
-  const { DEFAULT_SETTINGS, apiKeySlot, findPrompt, providerById } = AICore
+  const { DEFAULT_SETTINGS, apiKeySlot, clampCardHeight, findPrompt, providerById } = AICore
 
   async function read(key, fallback) {
     try {
@@ -138,14 +138,10 @@
           ? 'off'
           : 'click'
 
-    // Which state the corner switch turns back on. A record written before that
-    // field existed has none; the trigger it is holding is the best guess.
-    const selectionTriggerOn =
-      merged.selectionTriggerOn === 'auto' || merged.selectionTriggerOn === 'click'
-        ? merged.selectionTriggerOn
-        : selectionTrigger === 'auto'
-          ? 'auto'
-          : 'click'
+    // Android layout: how tall the card may grow, and whether it shows what you
+    // sent as well as the answers.
+    const panelMaxHeight = clampCardHeight(merged.panelMaxHeight ?? DEFAULT_SETTINGS.panelMaxHeight)
+    const showSentContent = merged.showSentContent !== false
 
     const contextMode = merged.contextMode === 'page' ? 'page' : 'paragraph'
 
@@ -190,7 +186,8 @@
       customModel,
       panelRect,
       selectionTrigger,
-      selectionTriggerOn,
+      panelMaxHeight,
+      showSentContent,
       composerPrompts,
       composerPromptId:
         findPrompt(composerPrompts, merged.composerPromptId ?? merged.systemPromptId)?.id ??
@@ -329,13 +326,6 @@
     // and changing provider loads that provider's preference.
     const editsThinking = Object.prototype.hasOwnProperty.call(patch, 'thinking')
     if (editsThinking) settings.thinkingByProvider[settings.providerId] = patch.thinking
-
-    // The corner switch on Android is a two-state control over the three-state
-    // trigger: remember the "on" state it has to be able to restore, whoever moved
-    // the trigger (this panel, the options page, another tab).
-    if (patch.selectionTrigger && patch.selectionTrigger !== 'off') {
-      settings.selectionTriggerOn = patch.selectionTrigger
-    }
 
     Object.assign(settings, patch)
 

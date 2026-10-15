@@ -71,11 +71,11 @@
       // Selection mode toggle --------------------------------------------------
       modeOn: '✦ 划词即问 · 已开启',
       modeOff: '✦ 启动划词即问',
-      modeOnTitle: '点击改为「选中后显示按钮」',
+      modeOnTitle: '点击改回：选中文字后先弹出按钮，点按钮才发送',
       modeOffTitle: '点击开启：在网页上选中文字就直接发给 AI',
-      modeHintOn: '现在在任意网页选中文字，就会直接发给我。',
-      modeHintOff: '开启后选中文字自动发送；关闭则改为弹出按钮、点击再发。',
-      modeHintOffWhenDisabled: '划词提问目前是关闭的，点上面按钮开启「选中即发送」。',
+      modeHintOn: '开启中：选中文字会立刻发送，每次划选都会产生一次 API 调用。',
+      modeHintOff: '现在选中文字会弹出「问 AI」小按钮，点它才发送。',
+      modeHintOffWhenDisabled: '划词提问目前是完全关闭的，点上面按钮开启「选中即发送」。',
       purposeHintOff: '划词提问现在是关闭的；选好用途后，把上面那项打开才会生效。',
       purposeHintOn: '选中文字后要做什么；「划词提问」一打开就按这里选的方式处理。',
       // Provider / model / key -------------------------------------------------
@@ -111,11 +111,19 @@
         '这个接口 + 模型之前拒绝了 temperature，已自动跳过（重新打开上面的开关可以强行发送）。',
       // Selection behaviour ----------------------------------------------------
       selectionTrigger: '划词提问',
-      triggerOff: '关闭（只选中，不发送）',
+      triggerOff: '完全关闭（选中后什么都不做）',
       triggerClick: '选中后显示按钮，点击提问',
       triggerAuto: '选中后自动提问',
-      triggerHint: '自动提问会在每次划选后立刻产生一次 API 调用；只想复制文字就用「关闭」。',
+      triggerHint: '自动提问会在每次划选后立刻产生一次 API 调用；只想复制文字就用「完全关闭」。',
       selectionPurpose: '划词用途',
+      // Android -----------------------------------------------------------------
+      androidSettings: '安卓设置',
+      cardMaxHeight: '内容框最高高度（px）',
+      cardMaxHeightNote: '内容框从屏幕底部往上长到这个高度就停住，再长就在框内滚动。',
+      showSentContent: '在内容框里显示我发送的内容',
+      showSentContentNote:
+        '关掉后内容框只留下 AI 的回答，划词时问的那句话不再显示（设置页里仍然能看到完整对话）。',
+      needKey: '还没有填 API Key：点扩展图标打开设置页填好，再回来划词提问。',
       // Prompt library ---------------------------------------------------------
       prompts: '提示词',
       composerPrompts: '提问提示词（在输入框提问时使用）',
@@ -141,8 +149,9 @@
       pillShort: '问 AI',
       selectionModeOff: '关闭',
       // Android corner controls -------------------------------------------------
-      selectionSwitchOn: '划词即问已开启，点按关闭',
-      selectionSwitchOff: '划词即问已关闭，点按开启',
+      switchAuto: '选中即发送：点按改回「先弹出按钮」，长按打开对话框',
+      switchClick: '选中后弹出「问 AI」按钮：点按改为「选中即发送」，长按打开对话框',
+      switchFullyOff: '划词提问已完全关闭：点按改为「选中即发送」，长按打开对话框',
       closePanel: '关闭面板',
       // Shipped prompts --------------------------------------------------------
       composerPromptName: '默认助手',
@@ -201,12 +210,12 @@
       stopped: '(stopped)',
       connectionLost: 'The background connection dropped — try again',
       modeOn: '✦ Ask on select · on',
-      modeOff: '✦ Turn on ask-on-select',
-      modeOnTitle: 'Click to ask only after pressing the button',
+      modeOff: '✦ Switch to “ask as soon as it is selected”',
+      modeOnTitle: 'Click to go back: a selection shows a button, and asking waits for a tap',
       modeOffTitle: 'Click to send the selection to the AI straight away',
-      modeHintOn: 'Selecting text on any page now goes straight to the assistant.',
-      modeHintOff: 'When on, selecting sends immediately; when off, a button appears instead.',
-      modeHintOffWhenDisabled: 'Ask-on-select is off — the switch above turns it on.',
+      modeHintOn: 'On: a selection is sent immediately — every selection is an API call.',
+      modeHintOff: 'A selection now shows the “Ask AI” button; the question goes out when you tap it.',
+      modeHintOffWhenDisabled: 'Ask-on-select is fully off — the button above turns on “send straight away”.',
       purposeHintOff: 'Ask-on-select is off — turn the switch above on to use this.',
       purposeHintOn: 'What to do with a selection; used as soon as ask-on-select is on.',
       provider: 'Provider',
@@ -238,12 +247,20 @@
       temperatureSkippedNote:
         'This endpoint + model rejected temperature earlier, so it is skipped (turn the switch above back on to force it).',
       selectionTrigger: 'Ask on select',
-      triggerOff: 'Off (selecting does nothing)',
+      triggerOff: 'Fully off (a selection does nothing)',
       triggerClick: 'Show a button next to the selection',
       triggerAuto: 'Ask as soon as text is selected',
       triggerHint:
-        'Asking automatically fires an API call on every selection; choose “Off” if you only want to copy text.',
+        'Asking automatically fires an API call on every selection; choose “Fully off” if you only want to copy text.',
       selectionPurpose: 'Selection action',
+      androidSettings: 'Android',
+      cardMaxHeight: 'Card height limit (px)',
+      cardMaxHeightNote:
+        'The card grows upward from the bottom of the screen and stops at this height; longer answers scroll inside it.',
+      showSentContent: 'Show what I sent in the card',
+      showSentContentNote:
+        'Off leaves only the answers in the card — the text you selected and asked about is still in the conversation on the settings page.',
+      needKey: 'No API key yet — tap the extension icon, fill one in on the settings page, then ask again.',
       prompts: 'Prompts',
       composerPrompts: 'Composer prompt (used when typing a question)',
       selectionPrompts: 'Selection prompt (used after selecting text)',
@@ -266,8 +283,9 @@
       pillShort: 'Ask AI',
       selectionModeOff: 'Off',
       // Android corner controls -------------------------------------------------
-      selectionSwitchOn: 'Ask on select is on — tap to turn it off',
-      selectionSwitchOff: 'Ask on select is off — tap to turn it on',
+      switchAuto: 'Send on select: tap for the button instead, long-press to open the card',
+      switchClick: 'A selection shows the “Ask AI” button: tap to send straight away, long-press to open the card',
+      switchFullyOff: 'Ask on select is fully off: tap to send straight away, long-press to open the card',
       closePanel: 'Close the panel',
       composerPromptName: 'Default assistant',
       composerPromptText:

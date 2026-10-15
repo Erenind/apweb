@@ -127,7 +127,42 @@
     void api.storage.session.remove(`${PANEL_STATE_PREFIX}${tabId}`).catch(() => {})
   })
 
+  /* ------------------------------ toolbar button ----------------------------- */
+
+  // Where the button leads depends on the platform: Android keeps its settings on
+  // a page of their own (the in-page card has no title bar and no ⚙), so there the
+  // button opens that page. Everywhere else it still toggles the floating panel.
+  async function isAndroid() {
+    try {
+      const info = await api.runtime.getPlatformInfo?.()
+      return info?.os === 'android'
+    } catch {
+      // No platform API: keep the desktop behaviour.
+      return false
+    }
+  }
+
+  async function openSettingsPage() {
+    try {
+      if (api.runtime.openOptionsPage) {
+        await api.runtime.openOptionsPage()
+        return
+      }
+    } catch {
+      // Older Android builds have not always had it; a tab does the same job.
+    }
+    try {
+      await api.tabs.create({ url: api.runtime.getURL('src/options/options.html') })
+    } catch {
+      // No tabs API either: nothing left to try.
+    }
+  }
+
   api.action?.onClicked.addListener(async (tab) => {
+    if (await isAndroid()) {
+      await openSettingsPage()
+      return
+    }
     if (!tab?.id) return
     try {
       await api.tabs.sendMessage(tab.id, { t: 'apweb:toggle-panel' })

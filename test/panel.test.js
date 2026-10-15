@@ -156,9 +156,22 @@ class El extends Node {
     this.tagName = String(tag).toUpperCase()
     this.childNodes = []
     // CSSStyleDeclaration reads back '' for unset properties; a plain object would
-    // read back undefined and make restore-the-page assertions lie.
+    // read back undefined and make restore-the-page assertions lie. The custom
+    // property API is here too: the Android card publishes its height through it.
+    const styleTarget = {
+      setProperty(name, value) {
+        styleTarget[name] = String(value)
+      },
+      getPropertyValue(name) {
+        return styleTarget[name] ?? ''
+      },
+      removeProperty(name) {
+        delete styleTarget[name]
+        return ''
+      },
+    }
     this.style = new Proxy(
-      {},
+      styleTarget,
       {
         get(target, prop) {
           if (typeof prop === 'symbol') return target[prop]
@@ -311,7 +324,11 @@ class El extends Node {
     // to keep the page's scrollbar visible beside a docked panel.
     return this._clientWidth ?? 0
   }
-  focus() {}
+  // Counted, not a no-op: on Android the card must not steal focus (that is what
+  // threw the on-screen keyboard over the answer).
+  focus() {
+    this.focusCount = (this.focusCount ?? 0) + 1
+  }
   select() {}
 }
 
@@ -667,11 +684,8 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   const modeBtn = panel.el.querySelector('.apweb-mode__btn')
   check('toggle button present', !!modeBtn)
   check('toggle now lives inside the settings form', !!settingsEl.querySelector('.apweb-mode__btn'))
-  check('toggle reflects auto mode', modeBtn.classList.contains('apweb-mode__btn--on'))
+  check('toggle is lit while the trigger is auto', modeBtn.classList.contains('apweb-mode__btn--on'))
   check('toggle says 已开启 when on', modeBtn.textContent.includes('已开启'))
-  modeBtn.dispatch('click', {})
-  check('toggle switches back to click mode', AIStore.state.settings.selectionTrigger === 'click')
-  check('toggle label resets', modeBtn.textContent.includes('启动划词即问'))
 
   // The toggle edits the same setting as the 划词提问 select right below it, so the
   // form must follow immediately instead of only after it is rebuilt.
@@ -681,16 +695,29 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   const actionSelectEl = settingsEl
     .querySelectorAll('select')
     .find((s) => s.getAttribute('data-field') === 'selection-action')
-  check('the 划词提问 select starts on click', triggerSelectEl.value === 'click')
+  check('the select shows the mode the form was built with', triggerSelectEl.value === 'auto')
+
+  // The settings-page twin of the Android corner switch: on = 选中即发送 ('auto'),
+  // off = 选中后先弹出按钮 ('click'). The two can never disagree.
   modeBtn.dispatch('click', {})
-  check('the toggle moves the 划词提问 select to auto', triggerSelectEl.value === 'auto')
-  check('划词用途 stays enabled while 划词提问 is on', actionSelectEl.disabled === false)
+  check('the toggle falls back to the button mode', AIStore.state.settings.selectionTrigger === 'click')
+  check('toggle label changes', modeBtn.textContent.includes('选中即发送'))
+  check('the select follows it immediately', triggerSelectEl.value === 'click')
+  check('划词用途 stays live', actionSelectEl.disabled === false)
+  check('the hint describes the button', panel.el.querySelector('.apweb-mode__hint').textContent.includes('小按钮'))
+
+  modeBtn.dispatch('click', {})
+  check('pressing again goes back to sending straight away', AIStore.state.settings.selectionTrigger === 'auto')
+  check('the select follows that too', triggerSelectEl.value === 'auto')
+  check('划词用途 is live again', actionSelectEl.disabled === false)
+  check('the toggle is lit again', modeBtn.classList.contains('apweb-mode__btn--on'))
+
+  // 「完全关闭」 is only reachable from the select; the button reads it as off.
   AIStore.updateSettings({ selectionTrigger: 'off' })
-  check('closing 划词提问 moves the select to off', triggerSelectEl.value === 'off')
-  check('and greys out 划词用途', actionSelectEl.disabled === true)
-  AIStore.updateSettings({ selectionTrigger: 'click' })
-  check('reopening re-enables 划词用途', actionSelectEl.disabled === false)
-  check('the select follows that too', triggerSelectEl.value === 'click')
+  check('a fully disabled trigger shows as off', !modeBtn.classList.contains('apweb-mode__btn--on'))
+  check('and says why', panel.el.querySelector('.apweb-mode__hint').textContent.includes('完全关闭'))
+  check('a selection does nothing, so 划词用途 greys out', actionSelectEl.disabled === true)
+  AIStore.updateSettings({ selectionTrigger: 'auto' })
 
   console.log('streamed composer turn')
   const composerBody = panel.el.querySelector('.apweb-composer__body')
@@ -1092,6 +1119,31 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   check('android resolves to the corner layout', AIPanel.isMobileLayout({ os: 'android' }) === true)
   check('another platform does not', AIPanel.isMobileLayout({ os: 'linux' }) === false)
 
+  // A phone never fires mouseup for a long-press selection: the word is picked and
+  // then the handles are dragged, so `selectionchange` is all that arrives. Without
+  // it the pill never appears and nothing is ever sent — the bug this covers.
+  AIStore.updateSettings({ selectionTrigger: 'click' })
+  shadowPill.hidden = true
+  const touchWord = new Text('полиглот')
+  paragraph.appendChild(touchWord)
+  range.startContainer = touchWord
+  range.toString = () => 'полиглот'
+  fakeSelection.anchorNode = touchWord
+  fakeSelection.focusNode = touchWord
+  fakeSelection.toString = () => 'полиглот'
+  document.dispatch('selectionchange', { target: document })
+  await new Promise((r) => setTimeout(r, 420))
+  check('a touch selection brings the pill up too', shadowPill.hidden === false)
+  check(
+    'and with the configured action on it',
+    shadowPill.textContent.includes(
+      AICore.selectionActionLabel(
+        AIStore.state.settings.selectionAction,
+        AIStore.state.settings.selectionPrompts,
+      ),
+    ),
+  )
+
   // `navigator` is a getter on the node global, so it has to be redefined rather
   // than assigned (the harness's own `globalThis.navigator = {}` is a no-op).
   const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
@@ -1115,26 +1167,29 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
     /inset:\s*auto\b/.test(androidCardRule) && /max-height:/.test(androidCardRule),
   )
   check('and stops short of the switch column', androidCardRule.includes('var(--ap-dock-column)'))
+  check('with the height setting as its ceiling', androidCardRule.includes('var(--ap-card-max'))
   const fabRule = panelRules.match(/\.apweb-fab\s*\{([^}]*)\}/)?.[1] ?? ''
   check('the corner controls are round', /border-radius:\s*999px/.test(fabRule))
   check('and pale while 划词即问 is off', fabRule.includes('var(--ap-fab-bg)'))
+  check('holding one cannot start a text selection', /user-select:\s*none/.test(fabRule))
   const fabOnRule = panelRules.match(/\.apweb-fab--on\s*\{([^}]*)\}/)?.[1] ?? ''
   check('the switch goes green while it is on', fabOnRule.includes('var(--ap-accent)'))
+  check(
+    'answers-only hides what you sent',
+    /\.apweb-panel--answers-only \.apweb-msg--user\s*\{[^}]*display:\s*none/.test(panelRules),
+  )
 
   AIStore.updateSettings({ selectionTrigger: 'click' })
   const android = AIPanel.createPanel({ startOpen: true, mobile: true })
   check('the scope is flagged as the mobile layout', android.el.classList.contains('apweb-scope--mobile'))
   const androidCard = android.el.querySelector('.apweb-panel')
+  check('the card is only the conversation and the composer', !android.el.querySelector('.apweb-panel__head'))
+  check('and its height setting reaches the stylesheet', android.el.style.getPropertyValue('--ap-card-max') === '420px')
   check(
     'nothing is placed by script: the stylesheet owns the geometry',
     androidCard.style.left === '' && androidCard.style.top === '' && androidCard.style.width === '',
   )
   check('an anchored card has no resize grip', !android.el.querySelector('.apweb-resize-handle'))
-  const androidHead = android.el.querySelector('.apweb-panel__head')
-  check(
-    'the header holds no second close button',
-    !androidHead.querySelectorAll('button').some((button) => button.textContent === '✕'),
-  )
 
   const starBtn = android.el.querySelector('.apweb-fab--switch')
   const cornerClose = android.el.querySelector('.apweb-fab--close')
@@ -1144,35 +1199,115 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   check('the switch carries the star svg', !!starBtn?.querySelector('svg'))
   check('and the close button the cross svg', !!cornerClose?.querySelector('svg'))
   check(
-    'the switch reads as on while 划词即问 is on',
-    starBtn?.classList.contains('apweb-fab--on') === true &&
-      starBtn?.getAttribute('aria-pressed') === 'true',
+    'the switch is pale while a selection waits for the button',
+    starBtn?.classList.contains('apweb-fab--on') === false &&
+      starBtn?.getAttribute('aria-pressed') === 'false',
   )
+  check('and says what a tap will do', (starBtn?.title ?? '').includes('选中即发送'))
   check('the close button shows with the open card', cornerClose?.hidden === false)
 
   starBtn.dispatch('click', {})
-  check('tapping the switch turns 划词即问 off', AIStore.state.settings.selectionTrigger === 'off')
+  check('tapping the switch sends on select', AIStore.state.settings.selectionTrigger === 'auto')
   check(
-    'and the switch goes pale',
-    starBtn.classList.contains('apweb-fab--on') === false &&
-      starBtn.getAttribute('aria-pressed') === 'false',
+    'and the switch goes green',
+    starBtn.classList.contains('apweb-fab--on') === true &&
+      starBtn.getAttribute('aria-pressed') === 'true',
   )
   starBtn.dispatch('click', {})
-  check('tapping it again restores the mode it had', AIStore.state.settings.selectionTrigger === 'click')
-  check('the switch turns green again', starBtn.classList.contains('apweb-fab--on') === true)
+  check('tapping it again goes back to the button', AIStore.state.settings.selectionTrigger === 'click')
+  check('and the switch goes pale', starBtn.classList.contains('apweb-fab--on') === false)
 
-  // The corner switch has two states over a three-state setting: 自动提问 must
-  // survive a trip through the off state.
-  AIStore.updateSettings({ selectionTrigger: 'auto' })
-  check('a mode chosen in the settings lights the switch', starBtn.classList.contains('apweb-fab--on'))
+  // A trigger set to 「完全关闭」 on the settings page reads as off here too, and a
+  // tap still means "send on select".
+  AIStore.updateSettings({ selectionTrigger: 'off' })
+  check('a fully disabled trigger keeps the switch pale', !starBtn.classList.contains('apweb-fab--on'))
+  check('and says so', (starBtn.title ?? '').includes('完全关闭'))
   starBtn.dispatch('click', {})
-  starBtn.dispatch('click', {})
-  check('and is the one it turns back on', AIStore.state.settings.selectionTrigger === 'auto')
+  check('tapping from fully off switches the sending on', AIStore.state.settings.selectionTrigger === 'auto')
   AIStore.updateSettings({ selectionTrigger: 'click' })
 
   cornerClose.dispatch('click', {})
   check('the corner close button hides the card', android.isOpen() === false && androidCard.hidden === true)
   check('and hides itself with it', cornerClose.hidden === true)
+
+  // With no title bar, holding the switch is the only way back to the card. The tap
+  // the browser sends afterwards must not also flip 划词即问.
+  starBtn.dispatch('pointerdown', {})
+  await new Promise((r) => setTimeout(r, 520))
+  check('a long press opens the card', android.isOpen() === true)
+  starBtn.dispatch('pointerup', {})
+  starBtn.dispatch('click', {})
+  check('and the click after it does nothing', AIStore.state.settings.selectionTrigger === 'click')
+  android.setOpen(false)
+  starBtn.dispatch('pointerdown', {})
+  starBtn.dispatch('pointerup', {})
+  starBtn.dispatch('click', {})
+  check('a short tap still toggles', AIStore.state.settings.selectionTrigger === 'auto')
+  AIStore.updateSettings({ selectionTrigger: 'click' })
+
+  // The card must not steal focus: on a phone that is what threw the on-screen
+  // keyboard over the answer the moment a word was selected.
+  const androidInput = androidCard.querySelector('.apweb-composer').querySelectorAll('textarea')[0]
+  androidInput.focusCount = 0
+  android.setOpen(false)
+  android.setOpen(true)
+  check('opening the card leaves the keyboard down', !androidInput.focusCount)
+  const desktopInput = panel.el.querySelector('.apweb-composer').querySelectorAll('textarea')[0]
+  desktopInput.focusCount = 0
+  panel.setOpen(false)
+  panel.setOpen(true)
+  check('a desktop panel still focuses its input', desktopInput.focusCount === 1)
+
+  // The two Android-only settings live on the settings page, which is an embedded
+  // panel: on Android it lists them, on a desktop it does not.
+  check('a desktop settings form lists no Android section', !settingsEl.querySelector('.apweb-settings__section'))
+  const optionsPanel = AIPanel.createPanel({
+    embed: true,
+    startOpen: true,
+    startWithSettings: true,
+    platform: { os: 'android' },
+  })
+  const optionsSettings = optionsPanel.el.querySelector('.apweb-settings')
+  check('the Android settings page lists its own section', !!optionsSettings.querySelector('.apweb-settings__section'))
+  check(
+    'and still keeps the desktop arrangement around it',
+    !optionsPanel.el.classList.contains('apweb-scope--mobile'),
+  )
+  const heightInput = optionsSettings
+    .querySelectorAll('input')
+    .find((input) => input.getAttribute('data-field') === 'panel-max-height')
+  check('with the card height', !!heightInput && heightInput.value === '420')
+  const sentSwitch = optionsSettings
+    .querySelectorAll('input')
+    .find((input) => input.getAttribute('data-field') === 'show-sent-content')
+  check('and the “show what I sent” switch', !!sentSwitch && sentSwitch.checked === true)
+
+  heightInput.value = '900'
+  heightInput.dispatch('input', { target: heightInput })
+  check('the height is saved', AIStore.state.settings.panelMaxHeight === 900)
+  check('and reaches the card without a reload', android.el.style.getPropertyValue('--ap-card-max') === '900px')
+  heightInput.value = '9'
+  heightInput.dispatch('input', { target: heightInput })
+  check('a silly height is clamped, not stored', AIStore.state.settings.panelMaxHeight === 160)
+
+  sentSwitch.checked = false
+  sentSwitch.dispatch('change', { target: sentSwitch })
+  check('the switch is saved', AIStore.state.settings.showSentContent === false)
+  check('and the card drops what you sent', androidCard.classList.contains('apweb-panel--answers-only'))
+  sentSwitch.checked = true
+  sentSwitch.dispatch('change', { target: sentSwitch })
+  check('turning it back on restores it', !androidCard.classList.contains('apweb-panel--answers-only'))
+
+  // The settings-page button and the corner switch are the same on/off: whichever
+  // one is pressed, the other follows.
+  const optionsModeBtn = optionsSettings.querySelector('.apweb-mode__btn')
+  optionsModeBtn.dispatch('click', {})
+  check('the settings page can switch sending on', AIStore.state.settings.selectionTrigger === 'auto')
+  check('and the corner switch goes green with it', starBtn.classList.contains('apweb-fab--on'))
+  starBtn.dispatch('click', {})
+  check('the corner switch can go back to the button', AIStore.state.settings.selectionTrigger === 'click')
+  check('and the settings button goes pale with it', !optionsModeBtn.classList.contains('apweb-mode__btn--on'))
+  optionsPanel.destroy()
   android.destroy()
 
   console.log(failures ? `\n${failures} FAILURE(S)` : '\nall checks passed')

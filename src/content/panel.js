@@ -171,6 +171,8 @@
   const PANEL_HEAD_KEEP = 60
   /** Must match the height transition on `.apweb-composer__body`. */
   const COMPOSER_ANIM_MS = 200
+  /** How long the corner switch has to be held to open the card instead of toggling. */
+  const LONG_PRESS_MS = 450
 
   function clampPanelRect(rect, viewport) {
     const maxWidth = Math.max(MIN_PANEL_WIDTH, viewport.width - PANEL_MARGIN * 2)
@@ -247,8 +249,12 @@
   function createPanel(options) {
     const opts = options ?? {}
     const embed = Boolean(opts.embed)
-    // The options page is embedded and always keeps the desktop arrangement.
-    const mobile = !embed && (opts.mobile ?? isMobileLayout())
+    // Android decides two things: the card layout on the page, and which settings
+    // the form offers — the Android-only ones live on the settings page, which is
+    // an embedded panel and so keeps the desktop arrangement around them.
+    const platformMobile = isMobileLayout(opts.platform)
+    const android = opts.android ?? opts.mobile ?? platformMobile
+    const mobile = !embed && (opts.mobile ?? platformMobile)
     const getSelection = opts.getSelection ?? (() => '')
     const describeContext = opts.describeContext ?? (() => null)
     const pageInfo = opts.pageInfo ?? (() => ({ title: document.title, url: location.href }))
@@ -363,7 +369,10 @@
     const composer = refs.composer
 
     refs.panel = h('section', { class: 'apweb-panel' }, [
-      head,
+      // The Android card is only the conversation and the composer: no title bar,
+      // no settings/clear/close buttons — its controls are the two in the corner,
+      // and the settings live on their own page.
+      mobile ? null : head,
       refs.settingsEl,
       refs.msgs,
       refs.failure,
@@ -374,14 +383,48 @@
     scope.appendChild(refs.panel)
 
     // The Android corner controls: a round switch that turns 划词即问 on and off,
-    // and — while the card is open — a round close button above it.
+    // and — while the card is open — a round close button above it. Since the card
+    // has no title bar, holding the switch is what brings it back.
     if (mobile) {
+      let pressTimer = null
+      let longPressed = false
+
+      const endPress = () => {
+        window.clearTimeout(pressTimer)
+        pressTimer = null
+      }
+
       refs.switchBtn = h('button', {
         type: 'button',
         class: 'apweb-fab apweb-fab--switch',
         'data-field': 'selection-switch',
-        on: { click: () => toggleSelectionOn() },
+        on: {
+          click: () => {
+            // A hold opens the card; the click that follows it must not also
+            // toggle the switch.
+            if (longPressed) {
+              longPressed = false
+              return
+            }
+            toggleSelectionAuto()
+          },
+        },
       }, [svgIcon(STAR_PATH)])
+      refs.switchBtn.addEventListener('pointerdown', () => {
+        longPressed = false
+        endPress()
+        pressTimer = window.setTimeout(() => {
+          pressTimer = null
+          longPressed = true
+          setOpen(true)
+        }, LONG_PRESS_MS)
+      })
+      // Releasing, sliding off the button or the browser cancelling the gesture all
+      // mean "not a hold".
+      for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
+        refs.switchBtn.addEventListener(type, endPress)
+      }
+
       refs.closeFab = h('button', {
         type: 'button',
         class: 'apweb-fab apweb-fab--close',
@@ -433,7 +476,11 @@
         syncHeader()
         if (showSettings) renderSettings()
         scrollToBottom(true)
-        if (!embed) refs.input.focus({ preventScroll: true })
+        // Android: never grab the input when the card appears. Selecting a word is
+        // what opens it there, and focusing would throw the on-screen keyboard over
+        // the answer before it has even streamed. Tapping the field still opens the
+        // keyboard, because that is the browser's own focus, not ours.
+        if (!embed && !mobile) refs.input.focus({ preventScroll: true })
       } else {
         opts.onClose?.()
       }
@@ -455,6 +502,8 @@
         refs.temperatureRow = null
         refs.temperatureInput = null
         refs.temperatureNote = null
+        refs.cardHeightInput = null
+        refs.sentRow = null
       }
       syncComposer()
     }
@@ -571,32 +620,48 @@
       refs.dot.classList.toggle('apweb-dot--live', streaming)
     }
 
-    /* ------------------------ the corner switch (Android) ---------------------- */
+    /* ---------------------------- ask on select ------------------------------- */
 
-    /** 划词即问 is on whenever the trigger is not the explicit off state. */
-    const isSelectionOn = () => S().selectionTrigger !== 'off'
+    /** 选中即发送 is the 'auto' trigger; 'click' selects first and asks on a tap. */
+    const isSelectionAuto = () => S().selectionTrigger === 'auto'
 
     /**
-     * The round switch in the corner. The settings form has three states for the
-     * same setting ("show a button" / "ask straight away" / off) and this control
-     * has two, so it turns back on to the state it remembers rather than to a fixed
-     * default — flipping it off and on must not silently change how a selection is
-     * handled.
+     * The one control behind both the Android corner switch and the settings form's
+     * ✦ button: on = 选中即发送, off = 选中后先弹出按钮。「完全关闭」 is reachable
+     * only from the select below them and reads as off here — so the two buttons can
+     * never claim different things about the same setting, which is what made them
+     * look out of sync.
      */
-    function setSelectionOn(on) {
-      update({ selectionTrigger: on ? S().selectionTriggerOn ?? 'click' : 'off' })
+    function setSelectionAuto(on) {
+      update({ selectionTrigger: on ? 'auto' : 'click' })
       syncLauncher()
     }
 
-    const toggleSelectionOn = () => setSelectionOn(!isSelectionOn())
+    const toggleSelectionAuto = () => setSelectionAuto(!isSelectionAuto())
+
+    /**
+     * Android: the two things the card's own settings change. Both are handed to
+     * the stylesheet — the height as a custom property (so the viewport cap next to
+     * it stays CSS's business) and "answers only" as a class, which reflows the
+     * transcript instead of rebuilding it.
+     */
+    function syncCardOptions() {
+      if (!mobile) return
+      scope.style.setProperty('--ap-card-max', `${S().panelMaxHeight}px`)
+      refs.panel.classList.toggle('apweb-panel--answers-only', S().showSentContent === false)
+    }
 
     /** Keep the corner controls in step with the setting, whoever changed it. */
     function syncLauncher() {
       if (!refs.switchBtn) return
-      const on = isSelectionOn()
-      refs.switchBtn.classList.toggle('apweb-fab--on', on)
-      refs.switchBtn.setAttribute('aria-pressed', String(on))
-      const label = on ? i18n.t('selectionSwitchOn') : i18n.t('selectionSwitchOff')
+      const auto = isSelectionAuto()
+      refs.switchBtn.classList.toggle('apweb-fab--on', auto)
+      refs.switchBtn.setAttribute('aria-pressed', String(auto))
+      const label = auto
+        ? i18n.t('switchAuto')
+        : S().selectionTrigger === 'off'
+          ? i18n.t('switchFullyOff')
+          : i18n.t('switchClick')
       refs.switchBtn.title = label
       refs.switchBtn.setAttribute('aria-label', label)
       refs.closeFab.hidden = !open
@@ -604,37 +669,24 @@
 
     /**
      * Refresh the prominent toggle inside the settings form, if that form is
-     * currently on screen. It reflects one question: does selecting text send it
-     * straight away? On = 'auto', off = 'click' (the pill). The reader-era
-     * 「完全关闭」 state stays reachable from the select just below it.
+     * currently on screen. It is the settings-page twin of the Android corner
+     * switch — same setting, same two meanings — so whichever one you press, the
+     * other agrees. The select just below still knows the third state, 完全关闭.
      */
     function refreshModeControl() {
       const btn = refs.modeBtn
       if (!btn) return
-      const trigger = S().selectionTrigger
-      const on = trigger === 'auto'
-      const off = trigger === 'off'
-      btn.classList.toggle('apweb-mode__btn--on', on)
-      btn.textContent = on ? i18n.t('modeOn') : i18n.t('modeOff')
-      btn.title = on
-        ? i18n.t('modeOnTitle')
-        : i18n.t('modeOffTitle')
+      const auto = isSelectionAuto()
+      btn.classList.toggle('apweb-mode__btn--on', auto)
+      btn.textContent = auto ? i18n.t('modeOn') : i18n.t('modeOff')
+      btn.title = auto ? i18n.t('modeOnTitle') : i18n.t('modeOffTitle')
       if (refs.modeHint) {
-        refs.modeHint.textContent = on
+        refs.modeHint.textContent = auto
           ? i18n.t('modeHintOn')
-          : off
+          : S().selectionTrigger === 'off'
             ? i18n.t('modeHintOffWhenDisabled')
             : i18n.t('modeHintOff')
       }
-    }
-
-    function toggleSelectionAuto() {
-      setSelectionAuto(S().selectionTrigger !== 'auto')
-    }
-
-    function setSelectionAuto(on) {
-      update({ selectionTrigger: on ? 'auto' : 'click' })
-      refreshModeControl()
     }
 
     /**
@@ -1066,7 +1118,10 @@
       setOpen(true)
       if (!ready()) {
         // Nothing to send with — surface the settings instead of failing mutely.
-        setShowSettings(true)
+        // On Android they are their own page, and the card must not hold a form, so
+        // it says where to go instead.
+        if (android) setFailure(i18n.t('needKey'))
+        else setShowSettings(true)
         return
       }
 
@@ -1169,7 +1224,7 @@
       refs.modeBtn = h('button', {
         type: 'button',
         class: 'apweb-mode__btn',
-        'data-field': 'selection-auto',
+        'data-field': 'selection-toggle',
         on: { click: () => toggleSelectionAuto() },
       })
       refs.modeHint = h('span', { class: 'apweb-mode__hint' })
@@ -1393,6 +1448,54 @@
         field(i18n.t('selectionPurpose'), refs.actionSelect, refs.actionHint),
       )
       refreshSelectionFields()
+
+      // Android -----------------------------------------------------------------
+      // The card on the page has no title bar, so everything that shapes it is
+      // here — and only here, which is why these two are listed apart.
+      if (android) {
+        refs.settingsEl.appendChild(
+          h('h4', { class: 'apweb-settings__section', text: i18n.t('androidSettings') }),
+        )
+        refs.cardHeightInput = h('input', {
+          type: 'number',
+          min: '160',
+          max: '2000',
+          step: '20',
+          value: String(settings.panelMaxHeight),
+          'data-field': 'panel-max-height',
+          on: {
+            input: (event) => {
+              const value = Number(event.target.value)
+              // A half-typed box must not be written as 0 (or NaN); a real value is
+              // rounded into the range the box offers.
+              if (event.target.value.trim() !== '' && Number.isFinite(value)) {
+                update({ panelMaxHeight: AICore.clampCardHeight(value) })
+              }
+            },
+          },
+        })
+        refs.settingsEl.appendChild(
+          field(
+            i18n.t('cardMaxHeight'),
+            refs.cardHeightInput,
+            h('span', { class: 'apweb-hint-inline', text: i18n.t('cardMaxHeightNote') }),
+          ),
+        )
+        refs.sentRow = h('label', { class: 'apweb-check' }, [
+          h('input', {
+            class: 'apweb-switch',
+            type: 'checkbox',
+            checked: settings.showSentContent !== false,
+            'data-field': 'show-sent-content',
+            on: { change: (event) => update({ showSentContent: event.target.checked }) },
+          }),
+          h('span', { text: i18n.t('showSentContent') }),
+        ])
+        refs.settingsEl.appendChild(refs.sentRow)
+        refs.settingsEl.appendChild(
+          h('p', { class: 'apweb-note', text: i18n.t('showSentContentNote') }),
+        )
+      }
 
       // Prompt libraries -------------------------------------------------------
       refs.settingsEl.appendChild(buildPrompts())
@@ -1674,6 +1777,7 @@
     const unsubscribe = AIStore.subscribe((_state, meta) => {
       syncHeader()
       syncLauncher()
+      syncCardOptions()
       refreshModeControl()
       refreshSelectionFields()
       refreshKeyFields()
@@ -1687,6 +1791,7 @@
     renderMessages()
     syncHeader()
     syncLauncher()
+    syncCardOptions()
     syncComposer()
     if (showSettings) renderSettings()
 
@@ -1698,7 +1803,7 @@
       askSelection,
       setSelectionAuto,
       buildSelectionContext,
-      isSelectionAuto: () => S().selectionTrigger === 'auto',
+      isSelectionAuto,
       openSettings: () => setShowSettings(true),
       focusComposer: () => refs.input.focus({ preventScroll: true }),
       destroy: () => {

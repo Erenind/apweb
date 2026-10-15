@@ -86,12 +86,15 @@
     // on the open web that would fire a request every time you copy a line, so
     // the default here is to show a small button and only ask when it is
     // clicked. 'auto' restores the reader's behaviour, 'off' disables it.
+    // Both the Android corner switch and the ✦ button in the settings form mean
+    // 'auto' (on) versus 'click' (off); 'off' is only reachable from the select.
     //   'click' | 'auto' | 'off'
     selectionTrigger: 'click',
-    // The Android corner switch has only two states over the three-state trigger
-    // above, so it remembers which of the "on" states to come back to. Kept in
-    // step by `store.updateSettings`, so the options page and other tabs agree.
-    selectionTriggerOn: 'click',
+    // Android layout only, both edited on the settings page: how tall the in-page
+    // card may grow before its transcript scrolls, and whether the text you sent
+    // shows up in it (the answers always do).
+    panelMaxHeight: 220,
+    showSentContent: true,
     // Which of `selectionPrompts` the button/auto-send uses, or 'off'.
     selectionAction: 'explain',
     // Two prompt libraries, one per entry point. Edit them, add your own,
@@ -248,6 +251,17 @@
   const FIXED_TEMPERATURE = {
     moonshot: /^kimi-(k3|k2\.6)/,
     openai: /^gpt-5/,
+  }
+
+  // The Android card's height setting, in px. The stylesheet caps it at the
+  // viewport on top of this; the bounds are here so a typo cannot get in.
+  const CARD_HEIGHT_RANGE = { min: 160, max: 2000 }
+
+  /** That setting, rounded into its range; a missing or silly value gets the default. */
+  function clampCardHeight(value) {
+    const number = Number(value)
+    if (!Number.isFinite(number)) return DEFAULT_SETTINGS.panelMaxHeight
+    return Math.min(Math.max(Math.round(number), CARD_HEIGHT_RANGE.min), CARD_HEIGHT_RANGE.max)
   }
 
   /** The fixed-temperature rule for this endpoint, or null if it takes a range. */
@@ -451,6 +465,7 @@
     temperatureControl,
     temperatureIsFixed,
     effectiveTemperature,
+    clampCardHeight,
     pairSlot,
     isTemperatureRejection,
     apiKeySlot,

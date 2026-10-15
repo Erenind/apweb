@@ -355,6 +355,19 @@ function eq(name, actual, expected) {
   eq('composer prompts default', AIStore.state.settings.composerPrompts.length, 1)
   eq('selection prompts default', AIStore.state.settings.selectionPrompts.length, 3)
 
+  console.log('AIStore: the Android card settings')
+  eq('card height default', AIStore.state.settings.panelMaxHeight, 420)
+  check('what you sent shows in the card by default', AIStore.state.settings.showSentContent === true)
+  eq('an absurd height is clamped', AICore.clampCardHeight(99999), 2000)
+  eq('a too-small one too', AICore.clampCardHeight(1), 160)
+  eq('a missing one falls back to the default', AICore.clampCardHeight(undefined), 420)
+  storage['apweb.ai.settings'] = { panelMaxHeight: 'not a number', showSentContent: false }
+  await AIStore.load()
+  eq('a stored typo does not survive a load', AIStore.state.settings.panelMaxHeight, 420)
+  check('and the switch is remembered', AIStore.state.settings.showSentContent === false)
+  storage['apweb.ai.settings'] = {}
+  await AIStore.load()
+
   console.log('AIStore: preset endpoint wins')
   storage['apweb.ai.settings'] = { providerId: 'deepseek', baseUrl: 'http://evil.local', model: '' }
   await AIStore.load()

@@ -277,6 +277,19 @@
       },
       true,
     )
+    // Android never fires mouseup for a long-press selection: the word is picked
+    // and then the handles are dragged, and the only thing that keeps arriving is
+    // `selectionchange`. Without this the feature looks broken on a phone — the
+    // button simply never appears, so nothing is ever sent.
+    document.addEventListener('selectionchange', scheduleSelectionCheck, true)
+    document.addEventListener(
+      'touchend',
+      (event) => {
+        if (isOurEvent(event)) return
+        scheduleSelectionCheck()
+      },
+      true,
+    )
     document.addEventListener(
       'mousedown',
       (event) => {
@@ -324,14 +337,13 @@
     const platform = Promise.resolve(api.runtime.getPlatformInfo?.()).catch(() => null)
     await AIStore.load()
 
-    const mobile = AIPanel.isMobileLayout(await platform)
-
     panel = AIPanel.createPanel({
       getSelection: selectionText,
       describeContext,
       pageInfo: () => ({ title: document.title, url: location.href }),
       onClose: () => hidePill(),
-      mobile,
+      // The panel decides both the layout and which settings to offer from this.
+      platform: await platform,
       startOpen,
       onOpenChange: (open) => {
         void api.runtime.sendMessage({ t: 'apweb:set-panel-state', open }).catch(() => {})
