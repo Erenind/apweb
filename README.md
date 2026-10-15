@@ -17,11 +17,10 @@
 
 ## 电脑端演示视频
 
-
+### 解释万物
 https://github.com/user-attachments/assets/bc1f69f5-f8a5-4b61-b212-e5975ba94816
-
-
-
+### AI翻译
+https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 
 
 ## 手机端演示视频
