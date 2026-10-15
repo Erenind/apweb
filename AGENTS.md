@@ -43,6 +43,7 @@ Commit subjects are short, lowercase and descriptive (`save panel rect`); one be
 
 - Persisted keys are namespaced `apweb.*`; store plain data only (DOM nodes are not structured-cloneable).
 - The panel's last `{ left, top, width, height }` lives in settings as `panelRect`; clamp it on restore.
+- Android builds the bottom layout instead (`.apweb-scope--mobile`): the card sits at the bottom left, a round 划词即问 switch with the close button above it in the bottom-right corner. `content.js` asks `runtime.getPlatformInfo()` for it (the user agent and a coarse pointer are the panel's fallbacks), and that layout owns its geometry — no drag, no resize grip, no `panelRect`. The switch is two-state over the three-state `selectionTrigger`, so `selectionTriggerOn` remembers what it turns back on.
 - The composer folds via the `composerOpen` setting.
 - Assistant replies render LaTeX: `math.js` masks formulas, then KaTeX (MathML-only build in `vendor/`) renders them after sanitising. Never widen DOMPurify's allow-list for maths.
 - UI and conversation language follow the browser (`AII18n.language()`); shipped prompts re-localise only while still unedited.

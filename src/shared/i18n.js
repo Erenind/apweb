@@ -140,6 +140,10 @@
       pillTitle: '用 AI 处理选中的文字（{label}）',
       pillShort: '问 AI',
       selectionModeOff: '关闭',
+      // Android corner controls -------------------------------------------------
+      selectionSwitchOn: '划词即问已开启，点按关闭',
+      selectionSwitchOff: '划词即问已关闭，点按开启',
+      closePanel: '关闭面板',
       // Shipped prompts --------------------------------------------------------
       composerPromptName: '默认助手',
       composerPromptText:
@@ -261,6 +265,10 @@
       pillTitle: 'Ask the AI about the selected text ({label})',
       pillShort: 'Ask AI',
       selectionModeOff: 'Off',
+      // Android corner controls -------------------------------------------------
+      selectionSwitchOn: 'Ask on select is on — tap to turn it off',
+      selectionSwitchOff: 'Ask on select is off — tap to turn it on',
+      closePanel: 'Close the panel',
       composerPromptName: 'Default assistant',
       composerPromptText:
         'You are a reading assistant inside the browser. The user shows you the page they are reading (sometimes just part of it); answer from that content when you can, and say so plainly when the answer is not there instead of making it up. Keep answers short and write them in English.',

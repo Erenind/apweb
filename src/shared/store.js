@@ -138,6 +138,15 @@
           ? 'off'
           : 'click'
 
+    // Which state the corner switch turns back on. A record written before that
+    // field existed has none; the trigger it is holding is the best guess.
+    const selectionTriggerOn =
+      merged.selectionTriggerOn === 'auto' || merged.selectionTriggerOn === 'click'
+        ? merged.selectionTriggerOn
+        : selectionTrigger === 'auto'
+          ? 'auto'
+          : 'click'
+
     const contextMode = merged.contextMode === 'page' ? 'page' : 'paragraph'
 
     // The 自定义 provider's own endpoint memory (see DEFAULT_SETTINGS).
@@ -181,6 +190,7 @@
       customModel,
       panelRect,
       selectionTrigger,
+      selectionTriggerOn,
       composerPrompts,
       composerPromptId:
         findPrompt(composerPrompts, merged.composerPromptId ?? merged.systemPromptId)?.id ??
@@ -319,6 +329,13 @@
     // and changing provider loads that provider's preference.
     const editsThinking = Object.prototype.hasOwnProperty.call(patch, 'thinking')
     if (editsThinking) settings.thinkingByProvider[settings.providerId] = patch.thinking
+
+    // The corner switch on Android is a two-state control over the three-state
+    // trigger: remember the "on" state it has to be able to restore, whoever moved
+    // the trigger (this panel, the options page, another tab).
+    if (patch.selectionTrigger && patch.selectionTrigger !== 'off') {
+      settings.selectionTriggerOn = patch.selectionTrigger
+    }
 
     Object.assign(settings, patch)
 

@@ -323,6 +323,8 @@ document.body = new El('body')
 document.documentElement.appendChild(document.body)
 document.createElement = (tag) => new El(tag)
 document.createTextNode = (text) => new Text(text)
+// The corner icons are inline SVG: real nodes, built with createElementNS.
+document.createElementNS = (_ns, tag) => new El(tag)
 document.implementation = { createHTMLDocument: () => document }
 
 globalThis.Node = Node
@@ -422,6 +424,11 @@ globalThis.browser = {
   runtime: {
     connect: ({ name }) => makePort(name),
     getURL: (path) => `moz-extension://test/${path}`,
+    // The content script asks this to pick the Android layout.
+    getPlatformInfo: async () => {
+      platformInfoCalls++
+      return { os: platformOs }
+    },
     onMessage: { addListener: (fn) => contentMessageListeners.push(fn) },
     sendMessage: async (message) => {
       sentToBackground.push(message)
@@ -437,6 +444,9 @@ globalThis.browser = {
 
 // What the background would hold for "is the floating panel showing in this tab".
 let tabPanelOpen = false
+// What `runtime.getPlatformInfo` answers, and whether it was asked at all.
+let platformOs = 'linux'
+let platformInfoCalls = 0
 // Set by a test that wants the next chat request to fail on `temperature` once.
 let rejectTemperatureOnce = false
 
@@ -1073,6 +1083,97 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
     .filter(Boolean)[0]
   check('later turns skip the field from the start', nextRequest && nextRequest.temperature === undefined)
   check('the transcript kept the earlier turns', AIStore.state.messages.length > answersBefore)
+
+  console.log('android layout')
+  // The content script asks the platform before it builds the panel; a desktop
+  // answer keeps the floating window it has always had.
+  check('the content script asked for the platform', platformInfoCalls > 0)
+  check('a desktop keeps the floating window', !host.shadowRoot.querySelector('.apweb-fab'))
+  check('android resolves to the corner layout', AIPanel.isMobileLayout({ os: 'android' }) === true)
+  check('another platform does not', AIPanel.isMobileLayout({ os: 'linux' }) === false)
+
+  // `navigator` is a getter on the node global, so it has to be redefined rather
+  // than assigned (the harness's own `globalThis.navigator = {}` is a no-op).
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+  Object.defineProperty(globalThis, 'navigator', {
+    value: { userAgent: 'Mozilla/5.0 (Android 14; Mobile; rv:142.0) Gecko/142.0' },
+    configurable: true,
+  })
+  check('the user agent covers a silent platform', AIPanel.isMobileLayout() === true)
+  Object.defineProperty(globalThis, 'navigator', navigatorDescriptor)
+  globalThis.matchMedia = (query) => ({ matches: /pointer:\s*coarse/.test(query) })
+  check('a touch-only device gets it too', AIPanel.isMobileLayout() === true)
+  delete globalThis.matchMedia
+  check('and a mouse-only desktop does not', AIPanel.isMobileLayout() === false)
+
+  // The stylesheet has to keep the card clear of the round controls and anchor it
+  // to the bottom; the pixels themselves are hand-tuned, so assert the shape.
+  const androidCardRule =
+    panelRules.match(/\.apweb-scope--mobile \.apweb-panel\s*\{([^}]*)\}/)?.[1] ?? ''
+  check(
+    'the card is anchored to the bottom corner',
+    /inset:\s*auto\b/.test(androidCardRule) && /max-height:/.test(androidCardRule),
+  )
+  check('and stops short of the switch column', androidCardRule.includes('var(--ap-dock-column)'))
+  const fabRule = panelRules.match(/\.apweb-fab\s*\{([^}]*)\}/)?.[1] ?? ''
+  check('the corner controls are round', /border-radius:\s*999px/.test(fabRule))
+  check('and pale while 划词即问 is off', fabRule.includes('var(--ap-fab-bg)'))
+  const fabOnRule = panelRules.match(/\.apweb-fab--on\s*\{([^}]*)\}/)?.[1] ?? ''
+  check('the switch goes green while it is on', fabOnRule.includes('var(--ap-accent)'))
+
+  AIStore.updateSettings({ selectionTrigger: 'click' })
+  const android = AIPanel.createPanel({ startOpen: true, mobile: true })
+  check('the scope is flagged as the mobile layout', android.el.classList.contains('apweb-scope--mobile'))
+  const androidCard = android.el.querySelector('.apweb-panel')
+  check(
+    'nothing is placed by script: the stylesheet owns the geometry',
+    androidCard.style.left === '' && androidCard.style.top === '' && androidCard.style.width === '',
+  )
+  check('an anchored card has no resize grip', !android.el.querySelector('.apweb-resize-handle'))
+  const androidHead = android.el.querySelector('.apweb-panel__head')
+  check(
+    'the header holds no second close button',
+    !androidHead.querySelectorAll('button').some((button) => button.textContent === '✕'),
+  )
+
+  const starBtn = android.el.querySelector('.apweb-fab--switch')
+  const cornerClose = android.el.querySelector('.apweb-fab--close')
+  const dock = android.el.querySelector('.apweb-dock')
+  check('the corner switch is there', !!starBtn && !!cornerClose)
+  check('with the close button above the switch', dock?.childNodes[0] === cornerClose && dock?.childNodes[1] === starBtn)
+  check('the switch carries the star svg', !!starBtn?.querySelector('svg'))
+  check('and the close button the cross svg', !!cornerClose?.querySelector('svg'))
+  check(
+    'the switch reads as on while 划词即问 is on',
+    starBtn?.classList.contains('apweb-fab--on') === true &&
+      starBtn?.getAttribute('aria-pressed') === 'true',
+  )
+  check('the close button shows with the open card', cornerClose?.hidden === false)
+
+  starBtn.dispatch('click', {})
+  check('tapping the switch turns 划词即问 off', AIStore.state.settings.selectionTrigger === 'off')
+  check(
+    'and the switch goes pale',
+    starBtn.classList.contains('apweb-fab--on') === false &&
+      starBtn.getAttribute('aria-pressed') === 'false',
+  )
+  starBtn.dispatch('click', {})
+  check('tapping it again restores the mode it had', AIStore.state.settings.selectionTrigger === 'click')
+  check('the switch turns green again', starBtn.classList.contains('apweb-fab--on') === true)
+
+  // The corner switch has two states over a three-state setting: 自动提问 must
+  // survive a trip through the off state.
+  AIStore.updateSettings({ selectionTrigger: 'auto' })
+  check('a mode chosen in the settings lights the switch', starBtn.classList.contains('apweb-fab--on'))
+  starBtn.dispatch('click', {})
+  starBtn.dispatch('click', {})
+  check('and is the one it turns back on', AIStore.state.settings.selectionTrigger === 'auto')
+  AIStore.updateSettings({ selectionTrigger: 'click' })
+
+  cornerClose.dispatch('click', {})
+  check('the corner close button hides the card', android.isOpen() === false && androidCard.hidden === true)
+  check('and hides itself with it', cornerClose.hidden === true)
+  android.destroy()
 
   console.log(failures ? `\n${failures} FAILURE(S)` : '\nall checks passed')
   process.exit(failures ? 1 : 0)

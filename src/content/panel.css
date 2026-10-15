@@ -18,6 +18,9 @@
   --ap-text-soft: rgba(44, 62, 80, 0.68);
   --ap-danger: #dc2626;
   --ap-shadow: 0 10px 40px rgba(0, 0, 0, 0.22);
+  /* The round controls in the Android corner: pale when 划词即问 is off. */
+  --ap-fab-bg: #ffffff;
+  --ap-fab-ink: #2c3e50;
 
   font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC',
     'Microsoft YaHei', sans-serif;
@@ -38,6 +41,8 @@
     --ap-text: rgba(235, 235, 235, 0.9);
     --ap-text-soft: rgba(235, 235, 235, 0.6);
     --ap-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+    --ap-fab-bg: #262626;
+    --ap-fab-ink: rgba(235, 235, 235, 0.9);
   }
 }
 
@@ -861,4 +866,97 @@
   border-radius: 50%;
   background: var(--ap-accent-ink);
   opacity: 0.7;
+}
+
+/* ------------------------ Android: the bottom corner ----------------------- */
+/* The whole UI sits along the bottom of the page: the card on the left, and a
+   column with the close button above the 划词即问 switch on the right. Built only
+   for a touch device (`.apweb-scope--mobile`), which is why every rule here is
+   prefixed with it — the desktop panel keeps its floating window. */
+
+.apweb-scope--mobile {
+  /* What the card has to leave clear on the right for the round controls. */
+  --ap-dock-size: 48px;
+  --ap-dock-edge: 12px;
+  --ap-dock-gap: 10px;
+  --ap-dock-right: 12px;
+  /* Everything along the bottom clears the Android gesture bar where the platform
+     reports one, and the plain 12px otherwise. */
+  --ap-dock-bottom: calc(var(--ap-dock-edge) + env(safe-area-inset-bottom, 0px));
+  --ap-dock-column: calc(var(--ap-dock-size) + var(--ap-dock-right) + var(--ap-dock-gap));
+}
+
+/* `inset` is top/right/bottom/left. The card is anchored rather than dragged, so
+   the saved desktop geometry does not apply to it. */
+.apweb-scope--mobile .apweb-panel {
+  inset: auto var(--ap-dock-column) var(--ap-dock-bottom) var(--ap-dock-edge);
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  /* Grows upward with the answer, but never past the top of the page; the
+     transcript is what scrolls once it is full. */
+  max-height: calc(100vh - var(--ap-dock-bottom) - var(--ap-dock-edge));
+  border-radius: 16px;
+}
+
+/* Anchored to a corner, the header is content rather than a drag handle. */
+.apweb-scope--mobile .apweb-panel__head {
+  cursor: default;
+  touch-action: auto;
+}
+
+/* The corner controls: bottom-right, close button above the switch. */
+.apweb-dock {
+  position: fixed;
+  right: var(--ap-dock-right);
+  bottom: var(--ap-dock-bottom);
+  z-index: 2147483646;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ap-dock-gap);
+}
+
+.apweb-fab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ap-dock-size);
+  height: var(--ap-dock-size);
+  padding: 0;
+  border: 1px solid var(--ap-border);
+  border-radius: 999px;
+  background: var(--ap-fab-bg);
+  color: var(--ap-fab-ink);
+  font-family: inherit;
+  line-height: 1;
+  box-shadow: var(--ap-shadow);
+  cursor: pointer;
+  /* A tap target that neither flashes grey nor zooms the page. */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.apweb-fab[hidden] {
+  display: none;
+}
+
+.apweb-fab svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.apweb-fab:active {
+  transform: scale(0.92);
+}
+
+/* 划词即问 on: the accent green fills the circle. Off — and the close button —
+   stay pale, so the switch reads at a glance from the other side of the page. */
+.apweb-fab--on {
+  border-color: transparent;
+  background: var(--ap-accent);
+  color: #ffffff;
 }

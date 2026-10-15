@@ -13,7 +13,6 @@
   <img alt="GitHub Created At" src="https://img.shields.io/github/created-at/erenind/apweb">
   <img alt="GitHub forks" src="https://img.shields.io/github/forks/erenind/apweb">
   <img alt="GitHub Repo stars" src="https://img.shields.io/github/stars/erenind/apweb">
-  <img alt="License" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue">
 </div>
 
 ## 电脑端演示视频
@@ -33,6 +32,7 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 - 提示词可自定义
 - 模型名称可任意填写
 - temperature可自定义
+- 按`ESC`可隐藏面板
 
 
 

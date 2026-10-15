@@ -317,13 +317,21 @@
       // No background yet: start closed.
     }
 
+    // Which layout to build: Android gets the bottom-corner one. The platform is
+    // the reliable signal (the user agent is only the panel's fallback) and asking
+    // for it needs no permission. Asked in parallel with the settings below: the
+    // answer only decides the layout, so it does not have to be waited on first.
+    const platform = Promise.resolve(api.runtime.getPlatformInfo?.()).catch(() => null)
     await AIStore.load()
+
+    const mobile = AIPanel.isMobileLayout(await platform)
 
     panel = AIPanel.createPanel({
       getSelection: selectionText,
       describeContext,
       pageInfo: () => ({ title: document.title, url: location.href }),
       onClose: () => hidePill(),
+      mobile,
       startOpen,
       onOpenChange: (open) => {
         void api.runtime.sendMessage({ t: 'apweb:set-panel-state', open }).catch(() => {})

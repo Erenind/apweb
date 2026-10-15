@@ -188,11 +188,67 @@
     return { left, top, width, height }
   }
 
+  /* ------------------------------ corner layout ------------------------------ */
+
+  /** The four points of the star on the corner switch, as one path. */
+  const STAR_PATH =
+    'M12 2c.7 5.5 4.5 9.3 10 10-5.5.7-9.3 4.5-10 10-.7-5.5-4.5-9.3-10-10 5.5-.7 9.3-4.5 10-10z'
+  const CROSS_PATH = 'M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5'
+
+  /**
+   * A 24×24 icon, built node by node. An `innerHTML` string would be shorter, but
+   * the content scripts run under a CSP without `eval`, and building the shape
+   * here keeps the icon — and its `currentColor` — in one place instead of in a
+   * string that has to be parsed.
+   */
+  function svgIcon(d, stroke) {
+    const NS = 'http://www.w3.org/2000/svg'
+    const svg = document.createElementNS(NS, 'svg')
+    svg.setAttribute('viewBox', '0 0 24 24')
+    svg.setAttribute('aria-hidden', 'true')
+    svg.setAttribute('focusable', 'false')
+    const path = document.createElementNS(NS, 'path')
+    path.setAttribute('d', d)
+    if (stroke) {
+      path.setAttribute('fill', 'none')
+      path.setAttribute('stroke', 'currentColor')
+      path.setAttribute('stroke-width', '2')
+      path.setAttribute('stroke-linecap', 'round')
+    } else {
+      path.setAttribute('fill', 'currentColor')
+    }
+    svg.appendChild(path)
+    return svg
+  }
+
+  /**
+   * Which layout to build. Android — where a floating window has no room to be
+   * dragged and the bottom corner is the one thumb-reachable spot — gets the
+   * bottom layout: the card on the left, the round controls on the right. Every
+   * other platform keeps the movable panel.
+   *
+   * `platform` is what `runtime.getPlatformInfo()` answered, when the caller could
+   * ask. The user agent and the pointer media query cover the rest, so a touch-only
+   * device that will not answer still gets the layout it can use.
+   */
+  function isMobileLayout(platform) {
+    if (typeof platform?.os === 'string') return platform.os === 'android'
+    const ua = globalThis.navigator?.userAgent ?? ''
+    if (/Android/i.test(ua)) return true
+    try {
+      return globalThis.matchMedia?.('(hover: none) and (pointer: coarse)')?.matches === true
+    } catch {
+      return false
+    }
+  }
+
   /* --------------------------------- the panel ------------------------------- */
 
   function createPanel(options) {
     const opts = options ?? {}
     const embed = Boolean(opts.embed)
+    // The options page is embedded and always keeps the desktop arrangement.
+    const mobile = !embed && (opts.mobile ?? isMobileLayout())
     const getSelection = opts.getSelection ?? (() => '')
     const describeContext = opts.describeContext ?? (() => null)
     const pageInfo = opts.pageInfo ?? (() => ({ title: document.title, url: location.href }))
@@ -222,7 +278,7 @@
     /* -------------------------------- structure ------------------------------- */
 
     const scope = h('div', {
-      class: `apweb-scope${embed ? ' apweb-scope--embed' : ''}`,
+      class: `apweb-scope${embed ? ' apweb-scope--embed' : ''}${mobile ? ' apweb-scope--mobile' : ''}`,
     })
 
     refs.model = h('span', { class: 'apweb-title__model' })
@@ -251,7 +307,9 @@
       h('div', { class: 'apweb-head-actions' }, [
         refs.settingsBtn,
         refs.clearBtn,
-        embed || opts.hideClose ? null : closeBtn,
+        // On Android the card is closed with the round button in the corner, so
+        // the header holds no second ✕.
+        embed || opts.hideClose || mobile ? null : closeBtn,
       ]),
     ])
 
@@ -314,6 +372,28 @@
     if (!open) refs.panel.hidden = true
 
     scope.appendChild(refs.panel)
+
+    // The Android corner controls: a round switch that turns 划词即问 on and off,
+    // and — while the card is open — a round close button above it.
+    if (mobile) {
+      refs.switchBtn = h('button', {
+        type: 'button',
+        class: 'apweb-fab apweb-fab--switch',
+        'data-field': 'selection-switch',
+        on: { click: () => toggleSelectionOn() },
+      }, [svgIcon(STAR_PATH)])
+      refs.closeFab = h('button', {
+        type: 'button',
+        class: 'apweb-fab apweb-fab--close',
+        'data-field': 'close-panel',
+        title: i18n.t('closePanel'),
+        on: { click: () => setOpen(false) },
+      }, [svgIcon(CROSS_PATH, true)])
+      // The column order is what puts the close button above the switch.
+      refs.dock = h('div', { class: 'apweb-dock' }, [refs.closeFab, refs.switchBtn])
+      scope.appendChild(refs.dock)
+    }
+
     isolate(scope)
     // Esc hides the panel. The listener has to sit on the scope: the panel stops
     // key events from reaching the page, so a page-level listener would never see
@@ -324,7 +404,7 @@
       setOpen(false)
     })
 
-    if (!embed) {
+    if (!embed && !mobile) {
       // A grip of our own instead of CSS `resize`: it is visible, it cannot be
       // confused with the browser's corner resizer, and — because we own the
       // drag — the size is saved exactly when the user finishes resizing.
@@ -338,12 +418,16 @@
       enableResize(refs.resizeHandle, refs.panel)
       applyStoredRect()
     }
+    // The Android card is anchored to the bottom corner instead: no grip, nothing
+    // to drag, and the stylesheet owns where it sits.
 
     /* --------------------------------- helpers -------------------------------- */
 
     function setOpen(next) {
       open = Boolean(next)
       refs.panel.hidden = !open
+      // The corner close button belongs to the card: no card, no close button.
+      syncLauncher()
       opts.onOpenChange?.(open)
       if (open) {
         syncHeader()
@@ -485,6 +569,37 @@
       const model = S().model
       refs.model.textContent = model || ''
       refs.dot.classList.toggle('apweb-dot--live', streaming)
+    }
+
+    /* ------------------------ the corner switch (Android) ---------------------- */
+
+    /** 划词即问 is on whenever the trigger is not the explicit off state. */
+    const isSelectionOn = () => S().selectionTrigger !== 'off'
+
+    /**
+     * The round switch in the corner. The settings form has three states for the
+     * same setting ("show a button" / "ask straight away" / off) and this control
+     * has two, so it turns back on to the state it remembers rather than to a fixed
+     * default — flipping it off and on must not silently change how a selection is
+     * handled.
+     */
+    function setSelectionOn(on) {
+      update({ selectionTrigger: on ? S().selectionTriggerOn ?? 'click' : 'off' })
+      syncLauncher()
+    }
+
+    const toggleSelectionOn = () => setSelectionOn(!isSelectionOn())
+
+    /** Keep the corner controls in step with the setting, whoever changed it. */
+    function syncLauncher() {
+      if (!refs.switchBtn) return
+      const on = isSelectionOn()
+      refs.switchBtn.classList.toggle('apweb-fab--on', on)
+      refs.switchBtn.setAttribute('aria-pressed', String(on))
+      const label = on ? i18n.t('selectionSwitchOn') : i18n.t('selectionSwitchOff')
+      refs.switchBtn.title = label
+      refs.switchBtn.setAttribute('aria-label', label)
+      refs.closeFab.hidden = !open
     }
 
     /**
@@ -1558,6 +1673,7 @@
 
     const unsubscribe = AIStore.subscribe((_state, meta) => {
       syncHeader()
+      syncLauncher()
       refreshModeControl()
       refreshSelectionFields()
       refreshKeyFields()
@@ -1570,6 +1686,7 @@
 
     renderMessages()
     syncHeader()
+    syncLauncher()
     syncComposer()
     if (showSettings) renderSettings()
 
@@ -1593,5 +1710,5 @@
     }
   }
 
-  globalThis.AIPanel = { createPanel }
+  globalThis.AIPanel = { createPanel, isMobileLayout }
 })()

@@ -88,6 +88,10 @@
     // clicked. 'auto' restores the reader's behaviour, 'off' disables it.
     //   'click' | 'auto' | 'off'
     selectionTrigger: 'click',
+    // The Android corner switch has only two states over the three-state trigger
+    // above, so it remembers which of the "on" states to come back to. Kept in
+    // step by `store.updateSettings`, so the options page and other tabs agree.
+    selectionTriggerOn: 'click',
     // Which of `selectionPrompts` the button/auto-send uses, or 'off'.
     selectionAction: 'explain',
     // Two prompt libraries, one per entry point. Edit them, add your own,
