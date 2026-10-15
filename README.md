@@ -33,7 +33,7 @@
 ## 安装
 ### firfox
 #### 扩展商店
-
+<a ref="https://addons.mozilla.org/zh-CN/firefox/addon/%E7%BD%91%E9%A1%B5-ai-%E5%8A%A9%E6%89%8B-%E5%88%92%E8%AF%8D%E9%97%AE%E7%AD%94/">点击跳转到firefox插件</a>
 
 #### 临时加载
 1. Firefox 打开 `about:debugging#/runtime/this-firefox`
