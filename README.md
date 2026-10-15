@@ -38,7 +38,7 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 ## 安装
 ### firfox
 #### 扩展商店
-<a ref="https://addons.mozilla.org/zh-CN/firefox/addon/%E7%BD%91%E9%A1%B5-ai-%E5%8A%A9%E6%89%8B-%E5%88%92%E8%AF%8D%E9%97%AE%E7%AD%94/">点击跳转到firefox插件</a>
+<a href="https://addons.mozilla.org/zh-CN/firefox/addon/%E7%BD%91%E9%A1%B5-ai-%E5%8A%A9%E6%89%8B-%E5%88%92%E8%AF%8D%E9%97%AE%E7%AD%94/">点击跳转到firefox插件</a>
 
 #### 临时加载
 1. Firefox 打开 `about:debugging#/runtime/this-firefox`
@@ -57,7 +57,6 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 
 ### safari
 🕳
-waiting for somebody developing
 
 ## 首次使用
 第一次使用：点工具栏上的图标打开面板 → 点 ⚙ → 选服务商、填 API Key → 「完成」。
