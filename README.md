@@ -13,6 +13,7 @@
   <img alt="GitHub Created At" src="https://img.shields.io/github/created-at/erenind/apweb">
   <img alt="GitHub forks" src="https://img.shields.io/github/forks/erenind/apweb">
   <img alt="GitHub Repo stars" src="https://img.shields.io/github/stars/erenind/apweb">
+  <img alt="License" src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue">
 </div>
 
 ## 电脑端演示视频
@@ -198,6 +199,7 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 | `src/options/options.html` | 首选项页：复用同一个面板 |
 | `test/` | 三个零依赖测试（node 内置模块），见下面「验证」 |
 | `web-ext-config.mjs` | `web-ext lint` / `build` 的忽略清单（把测试和文档排除在打包外） |
+| `LICENSE` | [PolyForm Noncommercial 1.0.0](LICENSE)：非商业免费，商业使用需另行授权 |
 | `vendor/` | `marked`、`DOMPurify`（来自 Reader 的 node_modules）与 KaTeX（JS + CSS + `.woff2` 字体），版本与许可见 `vendor/LICENSES.md` |
 | `icons/` | 图标：`icon.svg` 是真源，`icon-*.png` 由它生成 |
 
@@ -243,3 +245,19 @@ nix-shell -p nodejs web-ext --run 'web-ext build'     # 打包成 zip
 
 `web-ext lint` 目前只剩两条 `UNSAFE_VAR_ASSIGNMENT` 提示：一条来自 DOMPurify 自身，
 一条是注入**已消毒**的 Markdown 结果（`DOMPurify.sanitize` 之后才赋值给 `innerHTML`）。
+
+## 许可证
+
+本项目采用 [PolyForm Noncommercial License 1.0.0](LICENSE)（全文见 `LICENSE`）：
+
+- **个人 / 非商业使用免费**：个人学习、研究、实验、私人娱乐、业余爱好，以及慈善组织、
+  教育机构、公共科研、公共安全与卫生、环保与政府机构的使用，都按许可证原文免费，
+  可以自己修改、也可以分发副本（分发时把 `LICENSE` 一起带上）。
+- **商业使用需要授权**：带商业目的的用法——公司内部生产工具、对外售卖、托管成
+  SaaS、随自有产品分发、为客户定制等——需要事先拿到书面的商业许可。请联系仓库主页
+  （GitHub Issues 或主页邮箱）说明用途。
+- `vendor/` 里的第三方库（`marked` MIT、`DOMPurify` MPL-2.0 或 Apache-2.0、KaTeX
+  MIT）仍按各自原许可证授权，与上面的条款无关，见 `vendor/LICENSES.md`。
+
+这不是 OSI 认可的开源许可证，属于「源码可见」（source-available）：源码可以看、
+可以改、可以自己用，但商用要单独谈。
