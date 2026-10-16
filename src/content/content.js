@@ -281,7 +281,64 @@
     // and then the handles are dragged, and the only thing that keeps arriving is
     // `selectionchange`. Without this the feature looks broken on a phone — the
     // button simply never appears, so nothing is ever sent.
-    document.addEventListener('selectionchange', scheduleSelectionCheck, true)
+    //
+    // A mouse drag fires `selectionchange` too, once per character it adds, so this
+    // listener on its own sent *half-finished* selections on the desktop: pause for
+    // 300ms in the middle of a drag and the settle timer fired. The same holds for a
+    // held key: shift+arrow extends the selection once per repeat, so a long hold
+    // used to send as well. Both are skipped while the gesture is still running, and
+    // the mouseup / keyup / touchend below run the check once it has really ended.
+    // The flags only gate this one listener — never `handleSelection` — so a release
+    // we never see cannot wedge the feature.
+    let pointerDown = false
+    const heldKeys = new Set()
+    for (const type of ['pointerdown', 'mousedown', 'touchstart']) {
+      document.addEventListener(
+        type,
+        () => {
+          pointerDown = true
+        },
+        true,
+      )
+    }
+    for (const type of ['pointerup', 'pointercancel', 'mouseup', 'touchend', 'touchcancel']) {
+      document.addEventListener(
+        type,
+        () => {
+          pointerDown = false
+        },
+        true,
+      )
+    }
+    // `keydown` repeats while a key is held; only the keys that can extend a
+    // selection count, so typing in the composer's box does not trip this.
+    document.addEventListener(
+      'keydown',
+      (event) => {
+        if (event.shiftKey || event.key?.startsWith('Arrow')) heldKeys.add(event.key)
+      },
+      true,
+    )
+    document.addEventListener(
+      'keyup',
+      (event) => {
+        heldKeys.delete(event.key)
+      },
+      true,
+    )
+    // Releasing outside the window never reaches us.
+    window.addEventListener('blur', () => {
+      pointerDown = false
+      heldKeys.clear()
+    })
+    document.addEventListener(
+      'selectionchange',
+      () => {
+        if (pointerDown || heldKeys.size) return
+        scheduleSelectionCheck()
+      },
+      true,
+    )
     document.addEventListener(
       'touchend',
       (event) => {

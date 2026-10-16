@@ -15,6 +15,8 @@
   <img alt="GitHub Repo stars" src="https://img.shields.io/github/stars/erenind/apweb">
 </div>
 
+## [To English README](README.en.md)
+
 ## 电脑端演示视频
 
 ### 解释万物
@@ -24,7 +26,7 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 
 
 ## 手机端演示视频
-🕳
+
 
 
 ## 提示
@@ -34,10 +36,11 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 - temperature可自定义
 - 按`ESC`可隐藏面板
 
+手机版提示：[安卓版（Firefox for Android）](#安卓版firefox-for-android)
 
 
 ## 安装
-### firfox
+### firefox
 #### 扩展商店
 <a href="https://addons.mozilla.org/zh-CN/firefox/addon/%E7%BD%91%E9%A1%B5-ai-%E5%8A%A9%E6%89%8B-%E5%88%92%E8%AF%8D%E9%97%AE%E7%AD%94/">点击跳转到firefox插件</a>
 
@@ -220,7 +223,7 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
   电脑端仍然是开/关浮动面板。
 - **右下角的圆钮 = 「选中即发送」开关**：深绿底 = 选中文字后立刻发送，浅色 = 选中文字后先
   弹出「问 AI」小按钮、点按钮才发送（默认就是这个）。点一下切换，**长按则把内容框叫出来**
-  ——内容框收起后没有标题栏，长按就是唯一的入口。
+  ——内容框收起后没有标题栏, 长按按钮显示或AI回答时自动显示。
 - **内容框自己不会弹键盘**：划词打开内容框时不会自动聚焦输入框（选中文字就弹键盘会挡住回答），
   想打字时点一下输入框即可；电脑端仍然是打开就聚焦。
 - **左下的内容框**：只有对话内容和输入框，**没有标题栏**（所以没有位置/大小可拖）。
@@ -252,7 +255,7 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 
 ## android 测试命令
 ```sh
-web-ext run --target=firefox-android --android-device=d97f8f24 --firefox-apk=org.mozilla.firefox --firefox-apk-component=org.mozilla.firefox.AppMomo
+web-ext run --target=firefox-android --android-device=设备ID --firefox-apk=org.mozilla.firefox --firefox-apk-component=org.mozilla.firefox.AppMomo
 ```
 
 

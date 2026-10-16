@@ -1112,6 +1112,62 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   check('the transcript kept the earlier turns', AIStore.state.messages.length > answersBefore)
 
   console.log('android layout')
+  // The other half of the selection story, on the desktop: a mouse drag fires
+  // `selectionchange` after every character, so pausing mid-drag must not send the
+  // half-selected text — the check waits for the button to come up.
+  // Park the selection first: an earlier test's mouseup may still have a settle
+  // timer in flight, and it would fire in the middle of the scenario below.
+  const parkedSelection = fakeSelection
+  fakeSelection = null
+  await new Promise((r) => setTimeout(r, 350))
+  fakeSelection = parkedSelection
+  AIStore.updateSettings({ selectionTrigger: 'auto' })
+  const dragWord = new Text('halfway')
+  paragraph.appendChild(dragWord)
+  range.startContainer = dragWord
+  range.toString = () => 'halfway'
+  fakeSelection.anchorNode = dragWord
+  fakeSelection.focusNode = dragWord
+  fakeSelection.toString = () => 'halfway'
+  document.dispatch('mousedown', { target: paragraph, composedPath: () => [paragraph] })
+  document.dispatch('selectionchange', { target: document })
+  await new Promise((r) => setTimeout(r, 420))
+  check(
+    'nothing is sent while the drag is still going',
+    !AIStore.state.messages.some((message) => message.content === 'halfway'),
+  )
+  document.dispatch('mouseup', { target: paragraph, composedPath: () => [paragraph] })
+  await new Promise((r) => setTimeout(r, 420))
+  await tick()
+  check(
+    'and it goes out once the drag ends',
+    AIStore.state.messages.some((message) => message.content === 'halfway'),
+  )
+
+  // Same story with the keyboard: holding shift+arrow extends the selection once
+  // per repeat, and only the release may send it.
+  const keysWord = new Text('held')
+  paragraph.appendChild(keysWord)
+  range.startContainer = keysWord
+  range.toString = () => 'held'
+  fakeSelection.anchorNode = keysWord
+  fakeSelection.focusNode = keysWord
+  fakeSelection.toString = () => 'held'
+  document.dispatch('keydown', { key: 'ArrowRight', shiftKey: true, target: paragraph })
+  document.dispatch('selectionchange', { target: document })
+  await new Promise((r) => setTimeout(r, 420))
+  check(
+    'nothing is sent while the key is still held',
+    !AIStore.state.messages.some((message) => message.content === 'held'),
+  )
+  document.dispatch('keyup', { key: 'ArrowRight', shiftKey: true, target: paragraph })
+  await new Promise((r) => setTimeout(r, 420))
+  await tick()
+  check(
+    'and it goes out when the key is released',
+    AIStore.state.messages.some((message) => message.content === 'held'),
+  )
+
   // The content script asks the platform before it builds the panel; a desktop
   // answer keeps the floating window it has always had.
   check('the content script asked for the platform', platformInfoCalls > 0)
@@ -1184,7 +1240,7 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   check('the scope is flagged as the mobile layout', android.el.classList.contains('apweb-scope--mobile'))
   const androidCard = android.el.querySelector('.apweb-panel')
   check('the card is only the conversation and the composer', !android.el.querySelector('.apweb-panel__head'))
-  check('and its height setting reaches the stylesheet', android.el.style.getPropertyValue('--ap-card-max') === '420px')
+  check('and its height setting reaches the stylesheet', android.el.style.getPropertyValue('--ap-card-max') === '220px')
   check(
     'nothing is placed by script: the stylesheet owns the geometry',
     androidCard.style.left === '' && androidCard.style.top === '' && androidCard.style.width === '',
@@ -1276,7 +1332,7 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   const heightInput = optionsSettings
     .querySelectorAll('input')
     .find((input) => input.getAttribute('data-field') === 'panel-max-height')
-  check('with the card height', !!heightInput && heightInput.value === '420')
+  check('with the card height', !!heightInput && heightInput.value === '220')
   const sentSwitch = optionsSettings
     .querySelectorAll('input')
     .find((input) => input.getAttribute('data-field') === 'show-sent-content')
