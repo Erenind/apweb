@@ -404,7 +404,7 @@ function makePort(name) {
   return port
 }
 
-globalThis.browser = {
+globalThis.chrome = {
   // The panel's UI language follows the browser's; pin it to Chinese so the
   // assertions below can read the strings, and exercise English separately in
   // logic.test.js.
@@ -428,7 +428,13 @@ globalThis.browser = {
         for (const key of Object.keys(obj)) {
           // storage.local structured-clones on write: the snapshot is frozen, so
           // mutating the live object afterwards must not change it.
-          const cloned = JSON.parse(JSON.stringify(obj[key] ?? null))
+          // Chromium can return object keys in a different order. Echo detection
+          // must compare data, or a local write replaces the live streamed reply.
+          const cloned = JSON.parse(JSON.stringify(obj[key] ?? null), (_key, value) =>
+            value && typeof value === 'object' && !Array.isArray(value)
+              ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]]))
+              : value,
+          )
           storage[key] = cloned
           changes[key] = { newValue: cloned }
         }
@@ -440,7 +446,7 @@ globalThis.browser = {
   },
   runtime: {
     connect: ({ name }) => makePort(name),
-    getURL: (path) => `moz-extension://test/${path}`,
+    getURL: (path) => `chrome-extension://test/${path}`,
     // The content script asks this to pick the Android layout.
     getPlatformInfo: async () => {
       platformInfoCalls++
@@ -701,7 +707,7 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   // off = 选中后先弹出按钮 ('click'). The two can never disagree.
   modeBtn.dispatch('click', {})
   check('the toggle falls back to the button mode', AIStore.state.settings.selectionTrigger === 'click')
-  check('toggle label changes', modeBtn.textContent.includes('选中即发送'))
+  check('toggle label changes', modeBtn.textContent === AII18n.t('modeOff'))
   check('the select follows it immediately', triggerSelectEl.value === 'click')
   check('划词用途 stays live', actionSelectEl.disabled === false)
   check('the hint describes the button', panel.el.querySelector('.apweb-mode__hint').textContent.includes('小按钮'))

@@ -44,10 +44,20 @@
   const recentWrites = new Map()
   const RECENT_WRITES_KEPT = 20
 
+  // Chromium storage can reorder object keys. Sort recursively so an echoed
+  // write still matches, preserving the live message object a stream updates.
+  function storageFingerprint(value) {
+    return JSON.stringify(value, (_key, item) =>
+      item && typeof item === 'object' && !Array.isArray(item)
+        ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]]))
+        : item,
+    )
+  }
+
   function rememberWrite(key, value) {
     let json
     try {
-      json = JSON.stringify(value)
+      json = storageFingerprint(value)
     } catch {
       return
     }
@@ -63,7 +73,7 @@
     if (!list?.length) return false
     let json
     try {
-      json = JSON.stringify(value)
+      json = storageFingerprint(value)
     } catch {
       return false
     }

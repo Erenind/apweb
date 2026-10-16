@@ -25,8 +25,6 @@ https://github.com/user-attachments/assets/bc1f69f5-f8a5-4b61-b212-e5975ba94816
 https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 
 
-## 手机端演示视频
-
 
 
 ## 提示
@@ -36,48 +34,68 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 - temperature可自定义
 - 按`ESC`可隐藏面板
 
-手机版提示：[安卓版（Firefox for Android）](#安卓版firefox-for-android)
+**分支说明**：当前 `chrome_edge` 分支用于 Chrome / Edge 桌面版；Firefox 和 Firefox for Android 版本请使用 `main` 分支。
 
 
 ## 安装
-### firefox
-#### 扩展商店
-<a href="https://addons.mozilla.org/zh-CN/firefox/addon/%E7%BD%91%E9%A1%B5-ai-%E5%8A%A9%E6%89%8B-%E5%88%92%E8%AF%8D%E9%97%AE%E7%AD%94/">点击跳转到firefox插件</a>
+### Edge（桌面版 121+）
 
-#### 临时加载
-1. Firefox 打开 `about:debugging#/runtime/this-firefox`
-2. 点「临时载入附加组件…」
-3. 选择本目录下的 **`manifest.json`**
+1. 下载并解压本仓库的 `chrome_edge` 分支，或克隆后切换到该分支。
+2. 打开 `edge://extensions`，开启「开发人员模式」。
+3. 点「加载解压缩的扩展」，选择包含 **`manifest.json`** 的仓库根目录。
+4. 将扩展固定到工具栏，打开普通网页，点击扩展图标。
 
-> 这是临时加载，重启 Firefox 后会消失；开发时改完代码点「重新载入」即可。
-> 想长期使用可以打包成 `.zip` 后用开发者版签名，或直接在这个页面继续临时加载。
+### Chrome（桌面版 121+）
 
+1. 下载并解压本仓库的 `chrome_edge` 分支，或克隆后切换到该分支。
+2. 打开 `chrome://extensions`，开启「开发者模式」。
+3. 点「加载已解压的扩展程序」，选择包含 **`manifest.json`** 的仓库根目录。
+4. 将扩展固定到工具栏，打开普通网页，点击扩展图标。
 
-### edge
-🕳
+> Chrome / Edge 选择的是整个文件夹，不是单独的清单文件或 Firefox 的 `.xpi`。
+> 无需安装 Node.js、构建或修改清单。请保留加载的目录；更新代码后，在扩展管理页点
+> 「重新加载」，再刷新正在使用插件的网页。
 
-### chrome
-🕳
+## 浏览器适配说明
 
-### safari
-🕳
+| 分支 | 目标浏览器 | 后台方式 |
+| --- | --- | --- |
+| `chrome_edge`（当前） | Chrome / Edge 桌面版 121+ | MV3 Service Worker |
+| `main` | Firefox / Firefox for Android | Firefox 后台事件页 |
+
+本分支使用 Chrome / Edge 专用清单：只声明 `background.service_worker`，不包含 Firefox
+专用的 `browser_specific_settings` 或 `background.scripts`。最低支持版本设为 121。
+`src/background-worker.js` 按顺序加载语言、AI 核心和后台逻辑，全部使用经典脚本，无需构建。
+
+扩展 API 使用 `browser ?? chrome`，异步消息通过 `sendResponse` + `return true` 回复，
+兼容不支持 Promise 消息监听器的 Chromium 版本。流式请求进行期间，Service Worker 每
+25 秒调用一次扩展 API，避免等待首个 token 或思考内容时因空闲而休眠；完成、失败、取消
+或断开连接时停止保活。补注入已打开的标签页时，使用清单中的完整脚本列表，包含语言、
+Markdown 和公式模块。
+
+存储写入回声按递归排序后的数据比较，兼容 Chromium 返回对象时改变字段顺序的行为，
+避免空白的历史快照覆盖正在生成的回复。
+
+Chrome / Edge 共用划词提问、流式回复、Markdown / LaTeX、设置和对话保存实现。
+设置、API Key 和聊天记录只在**当前浏览器配置文件**内共享，不会在不同浏览器之间自动同步。
+`chrome://`、`edge://` 和扩展商店等受限页面无法显示面板。
 
 ## 首次使用
 第一次使用：点工具栏上的图标打开面板 → 点 ⚙ → 选服务商、填 API Key → 「完成」。
-也可以直接在扩展的「首选项」页里配置（`about:addons` → 本扩展 → 首选项），两处是同一份设置。
+也可以在 `chrome://extensions` 或 `edge://extensions` → 本扩展「详情」→「扩展程序选项」中配置，两处是同一份设置。
 
 ## 功能说明
 - **API请求**: 走 **OpenAI 兼容**协议，所以 DeepSeek / OpenAI / Moonshot / 通义 / 智谱 / OpenRouter / 本地 Ollama 都能用。请求由浏览器直接发往你填的接口地址，**key 只存在本机**，不经过任何中转。
-- **界面语言跟随浏览器**：`browser.i18n.getUILanguage()` 是中文就用中文，其它一律用英文
-  （取不到时退回 `navigator.language`；内容脚本里这一项由后台页随面板状态一起下发，
+- **界面语言跟随浏览器**：`chrome.i18n.getUILanguage()` 是中文就用中文，其它一律用英文
+  （取不到时退回 `navigator.language`；内容脚本里这一项由后台 Service Worker 随面板状态一起下发，
   因为内容脚本不一定有 i18n 权限）。**对话语言也跟着走**：默认提示词就是按当前语言发的，
   英文浏览器里默认助手会要求"write them in English"，划词默认动作也变成英文的
   "Explain and translate"。你自己改过的提示词不会被覆盖——只有仍是**出厂原文**的那些
   才会在语言切换时跟着换。没有面板内的语言开关，改语言就改浏览器语言。
 - **开启划词即问**：点 ⚙ 打开设置，表单顶部是一个醒目的 `✦ 启动划词即问` 按钮，
   按下后变成实心绿色的 `✦ 划词即问 · 已开启`，下面一行小字说明当前行为；再点一下回到
-  「选中后先弹出按钮，点按钮才发送」。它和下面的「划词提问」下拉、以及安卓右下角的圆钮是
-  **同一个设置，三处同步**——按钮只在这两种模式之间切换；想彻底不提问（选中后什么都不做），
+  「选中后先弹出按钮，点按钮才发送」。它和下面的「划词提问」下拉是
+  **同一个设置，保持同步**——按钮只在这两种模式之间切换；想彻底不提问（选中后什么都不做），
   只在下面的下拉里选「完全关闭」。
 - **划词提问**：在任意网页上选中文字，旁边出现一个绿色按钮（默认显示选中内容要用的用途，
   例如「解释并翻译」），点它就会把这段文字发给模型。设置里可以改成「选中后自动提问」。
@@ -155,7 +173,7 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 - **划词默认不自动发**。；在开放网页上，选中文字往往只是想复制，所以这里的默认是「选中后显示按钮，点击提问」。
 - **上下文从「当前页 PDF 正文」换成**「选中处所在的那一段」（可切到整页正文），
   页面标题和 URL 会一并附上，方便模型知道你在看什么。
-- **设置存在 `browser.storage.local`**，面板在任意网页都能读到同一份；key 不再是每个站点一份。
+- **设置存在 `chrome.storage.local`**，面板在任意网页都能读到同一份；key 不再是每个站点一份。
 - **设置和对话都只写纯数据**。面板为了流式更新会把 DOM 节点挂在内存里的消息对象上，而 DOM 节点
   不可结构化克隆——直接写整份对象会让 `storage.set` 失败、整段历史都存不下来，所以落盘前会先
   把消息压成 `role`/`content`/`context`… 这几个字段。
@@ -167,10 +185,10 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 ## 已知取舍
 
 - **需要 `host_permissions: <all_urls>`**：既要往任意服务商/自建中转发请求，又要在任意网页
-  注入面板和划词按钮，所以权限比较宽。装了之后 Firefox 会明确提示。
-- **受目标服务的 CORS 策略限制**：请求从后台页发出（不是从网页），正常不受网页 CORS 影响；
+  注入面板和划词按钮，所以权限比较宽。安装时浏览器会明确提示。
+- **受目标服务的 CORS 策略限制**：请求从后台 Service Worker 发出（不是从网页），正常不受网页 CORS 影响；
   但服务商若拒绝浏览器直连，会看到「连不上这个接口」。
-- **受限页面没有面板**：`about:`、`chrome://`、附加组件商店等页面无法注入。
+- **受限页面没有面板**：`chrome://`、`edge://`、扩展商店等页面无法注入。
   在扩展刚安装前就开着的标签页，第一次点工具栏会**按需注入**内容脚本，之后正常。
 - **严格 CSP 的网站**：面板样式通过影子根里的 `<link>` 加载扩展内 CSS；极少数 CSP
   极严的站点可能加载失败（面板会变得朴素但功能仍在）。
@@ -191,13 +209,14 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 
 | 路径 | 作用 |
 | --- | --- |
-| `manifest.json` | MV3 清单：后台页、内容脚本、工具栏按钮、选项页 |
+| `manifest.json` | Chrome / Edge MV3 清单：Service Worker、内容脚本、工具栏按钮、选项页 |
 | `src/shared/ai.js` | Reader `src/lib/ai.js` 的移植：服务商、思考开关、提示词、流式客户端 |
 | `src/shared/i18n.js` | 界面与对话语言：zh/en 两份文案表，按浏览器语言取用（每个宿主都必须最先加载它） |
 | `src/shared/math.js` | LaTeX 抽取：把公式换成占位符、渲染后填回（`test/logic.test.js` 覆盖边界情况） |
 | `src/shared/markdown.js` | Reader `src/lib/markdown.js` 的移植：marked + DOMPurify |
 | `src/shared/store.js` | Reader `src/lib/chat-storage.js` 的移植：设置/消息持久化与归一化 |
-| `src/background.js` | 后台事件页：发请求（绕开网页 CORS）、流式回传、工具栏按钮、每标签页面板状态 |
+| `src/background.js` | 共用后台：发请求（绕开网页 CORS）、流式回传、工具栏按钮、每标签页面板状态 |
+| `src/background-worker.js` | Chrome / Edge Service Worker 入口，按顺序载入共用后台模块 |
 | `src/content/content.js` | 内容脚本：影子根、划词检测、「问 AI」浮动按钮、页面上下文提取、Esc 收起 |
 | `src/content/panel.js` | 对话面板 + 设置表单（Reader `ChatPanel.vue`/`ChatSettingsForm.vue` 的 DOM 重写） |
 | `src/content/panel.css` | 面板样式（影子根里加载，选项页也复用） |
@@ -210,54 +229,8 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 
 
 **纯 DOM + 原生 JS**，逻辑（`ai.js` / `store.js` / `markdown.js`）以经典脚本
-（挂在 `globalThis` 上）在后台页和内容脚本之间共用，`node --check` 与下面那套
+（挂在 `globalThis` 上）在后台 Service Worker 和内容脚本之间共用，`node --check` 与下面那套
 测试即可保证质量。
-
-# 安卓版（Firefox for Android）
-
-安卓上界面和设置的位置与电脑端不同：网页里只剩一个内容框和一排圆钮，**设置独立成一页**。
-
-## 怎么用
-
-- **点扩展图标 = 打开设置页**：安卓上工具栏图标不再开/关面板，而是直接进入设置页；
-  电脑端仍然是开/关浮动面板。
-- **右下角的圆钮 = 「选中即发送」开关**：深绿底 = 选中文字后立刻发送，浅色 = 选中文字后先
-  弹出「问 AI」小按钮、点按钮才发送（默认就是这个）。点一下切换，**长按则把内容框叫出来**
-  ——内容框收起后没有标题栏, 长按按钮显示或AI回答时自动显示。
-- **内容框自己不会弹键盘**：划词打开内容框时不会自动聚焦输入框（选中文字就弹键盘会挡住回答），
-  想打字时点一下输入框即可；电脑端仍然是打开就聚焦。
-- **左下的内容框**：只有对话内容和输入框，**没有标题栏**（所以没有位置/大小可拖）。
-  框外右上角那个圆形 ✕ 收起它；内容框从屏幕底部往上长，长到「内容框最高高度」就在框内滚动。
-- **输入框可折叠**：输入框左上角的小箭头，点一下收起/展开输入行，状态和电脑端是同一个设置。
-- **选词后弹「问 AI」**：手机上的长按选词不会触发 `mouseup`，所以划词检测改为跟随
-  `selectionchange` / `touchend`；选完稍等一下，绿色小按钮会出现在选区旁边，点它才提问。
-
-## 安卓特有设置
-
-设置页里的「安卓设置」一节只在安卓上出现（电脑端看不见）：
-
-| 设置 | 作用 | 默认 |
-| --- | --- | --- |
-| **内容框最高高度（px）** | 内容框从屏幕底部往上长到这个高度就停住，再长就在框内滚动。范围 160–2000；屏幕比它矮时以屏幕为准。 | 220 |
-| **在内容框里显示我发送的内容** | 关掉后内容框只留下 AI 的回答，划词时问的那句话不再显示；设置页里仍然能看到完整对话。 | 开 |
-
-两项都存在 `browser.storage.local`（`panelMaxHeight` / `showSentContent`），改完立刻生效，
-不用重载页面。
-
-## 设置页与内容框的分工
-
-- **设置页**：API Key、服务商、模型、temperature、思考模式、两套提示词、划词提问与划词用途、
-  以及上面两项安卓设置。它和电脑端面板里的 ⚙ 是同一份设置、同一个页面实现。
-- **内容框**：只负责看回答和提问。它固定贴在屏幕底部，不参与拖动/拉伸，也不会写 `panelRect`。
-- 两边共用同一份 storage：在设置页改动会在网页里的内容框上立即生效，反之亦然
-  （右下角圆钮和设置页里那个 `✦` 按钮是同一个开关、同样两种含义：绿 = 选中即发送，淡 = 选中后
-  先弹按钮，两边同步）。
-
-## android 测试命令
-```sh
-web-ext run --target=firefox-android --android-device=设备ID --firefox-apk=org.mozilla.firefox --firefox-apk-component=org.mozilla.firefox.AppMomo
-```
-
 
 ## icon设计
 改完 `icons/icon.svg` 之后重新生成 PNG：
@@ -275,27 +248,36 @@ done
 ```sh
 node test/logic.test.js       # 服务商/思考开关/key 槽位/提示词/消息上限等纯逻辑
 node test/panel.test.js       # 面板构建、设置表单、流式回合、划词→按钮→提问、拖动/拉伸、Esc
-node test/background.test.js  # 后台：每标签页的面板状态
+node test/background.test.js  # Chrome / Edge 后台：状态、消息、注入、流式请求及保活清理
 ```
 
 `panel.test.js` 用一个手写的小型 DOM（带真实的捕获/冒泡 + `stopPropagation` 语义）
 加一个假的 WebExtension 端口，跑的是**真实的** `panel.js` / `content.js` / `store.js` /
 `ai.js`，覆盖：流式回合、划词→按钮→提问、拖动改位置与「松手就结束拖动」、
 位置与大小的保存/还原、Esc 收起、开合状态、划词即问开关、跨界面同步，以及「消息落盘只有纯数据」
-这类回归。`background.test.js` 用桩覆盖每标签页的面板状态（含关标签页时清理）。它们**不覆盖**
+这类回归。所有测试仅提供 `chrome` API；`background.test.js` 在无 DOM 的 Chromium Worker 环境中，
+用桩覆盖异步消息、状态跨后台重启保留、脚本补注入，以及流式请求完成/报错/取消/断开后的保活清理。
+它们**不覆盖**
 真实浏览器里的样式、DOMPurify 的净化结果
-和 Shadow DOM 行为——这三点需要在 Firefox 里手动看一眼。
+和 Shadow DOM 行为——这三点需要在各目标浏览器里手动检查。
 
-扩展本身用 [`web-ext`](https://extensionworkshop.com/documentation/develop/getting-started-with-web-ext/)
-校验（`web-ext-config.mjs` 已经把测试和文档排除在打包之外）：
+本次适配已在 Chromium 152 中验证扩展加载、设置页、面板状态恢复、流式回复、Markdown /
+LaTeX 渲染、聊天记录保存及停止生成；关闭 Worker 调试连接后，等待 35 秒才收到响应头的
+本地模拟接口也能完成回复。Edge 尚未单独实机验证。
+
+可以用 [`web-ext`](https://extensionworkshop.com/documentation/develop/getting-started-with-web-ext/)
+打包及辅助静态检查（`web-ext-config.mjs` 配置打包忽略项）：
 
 ```sh
-nix-shell -p nodejs web-ext --run 'web-ext lint'      # 0 errors
+nix-shell -p nodejs web-ext --run 'web-ext lint'      # Firefox 静态检查，见下方适用范围
 nix-shell -p nodejs web-ext --run 'web-ext build'     # 打包成 zip
 ```
 
-`web-ext lint` 目前只剩两条 `UNSAFE_VAR_ASSIGNMENT` 提示：一条来自 DOMPurify 自身，
-一条是注入**已消毒**的 Markdown 结果（`DOMPurify.sanitize` 之后才赋值给 `innerHTML`）。
+`web-ext lint` 面向 Firefox：本分支会报告 `BACKGROUND_SERVICE_WORKER_NOFALLBACK`、
+`ADDON_ID_REQUIRED` 两个 Firefox 兼容性错误，以及缺少 Firefox 数据收集声明和两处
+`UNSAFE_VAR_ASSIGNMENT` 警告；后两处来自 DOMPurify 及已净化 Markdown 的 `innerHTML` 赋值。
+它不能替代 Chrome / Edge 的实际加载验证。修改后请在扩展管理页检查错误，并验证工具栏开关、
+划词提问、设置保存、流式回复和停止生成。打包后的 zip 可用于分发；本地加载前需先解压。
 
 ## 许可证
 

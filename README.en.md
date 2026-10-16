@@ -21,8 +21,6 @@
 
 ### AI Translation
 
-## Mobile Demo Videos
-
 ## Tips
 
 - Answer quality depends on the prompts and the AI model.
@@ -31,45 +29,61 @@
 - Temperature is customizable.
 - Press `ESC` to hide the panel.
 
-Mobile tips: [Android (Firefox for Android)](#android-firefox-for-android)
+**Branches**: `chrome_edge` targets Chrome / Edge desktop. Use `main` for Firefox and Firefox for Android.
 
 ## Installation
 
-### Firefox
+### Edge (desktop 121+)
 
-#### Add-ons Store
+1. Download and extract the `chrome_edge` branch, or clone the repository and switch to that branch.
+2. Open `edge://extensions` and enable "Developer mode".
+3. Click "Load unpacked" and select the repository root containing **`manifest.json`**.
+4. Pin the extension to the toolbar, open a regular web page, and click its icon.
 
-<a href="https://addons.mozilla.org/zh-CN/firefox/addon/%E7%BD%91%E9%A1%B5-ai-%E5%8A%A9%E6%89%8B-%E5%88%92%E8%AF%8D%E9%97%AE%E7%AD%94/">Open the Firefox add-on page</a>
+### Chrome (desktop 121+)
 
-#### Temporary Installation
+1. Download and extract the `chrome_edge` branch, or clone the repository and switch to that branch.
+2. Open `chrome://extensions` and enable "Developer mode".
+3. Click "Load unpacked" and select the repository root containing **`manifest.json`**.
+4. Pin the extension to the toolbar, open a regular web page, and click its icon.
 
-1. Open `about:debugging#/runtime/this-firefox` in Firefox.
-2. Click "Load Temporary Add-on…".
-3. Select **`manifest.json`** in this directory.
+> Select the entire folder, not the manifest file alone or a Firefox `.xpi`.
+> No Node.js installation, build step, or manifest changes are needed. Keep the loaded directory
+> in place. After updating the code, reload the extension and refresh pages using it.
 
-> This is a temporary installation and will disappear when you restart Firefox. During development,
-> click "Reload" after changing the code.
-> For long-term use, you can package it as a `.zip` and have the developer version signed,
-> or continue loading it temporarily from this page.
+## Browser Compatibility
 
-### Edge
+| Branch | Target browsers | Background environment |
+| --- | --- | --- |
+| `chrome_edge` (this branch) | Chrome / Edge desktop 121+ | MV3 service worker |
+| `main` | Firefox / Firefox for Android | Firefox event page |
 
-🕳
+This branch uses a Chrome / Edge manifest with only `background.service_worker`, without
+Firefox-specific `browser_specific_settings` or `background.scripts`. The minimum supported
+version is 121. `src/background-worker.js` loads localization, the AI core, and background logic
+in order, using classic scripts with no build step.
 
-### Chrome
+Extension APIs use `browser ?? chrome`. Asynchronous messages reply through `sendResponse`
+with `return true`, including Chromium versions without Promise-based message listeners.
+During a streaming request, the service worker calls an extension API every 25 seconds to avoid
+idling out while waiting for the first token or reasoning output. Keep-alive stops on completion,
+failure, cancellation, or disconnection. On-demand injection into existing tabs uses the complete
+manifest script list, including localization, Markdown, and math modules.
 
-🕳
+Storage echoes are compared with recursively sorted object keys, since Chromium can return
+fields in a different order. This prevents an empty history snapshot from replacing a live reply.
 
-### Safari
-
-🕳
+Chrome / Edge share selection questions, streaming replies, Markdown / LaTeX, settings, and chat
+storage. Settings, API keys, and history are shared only within the **current browser profile**,
+with no automatic synchronization between browsers. Restricted pages such as `chrome://`,
+`edge://`, and extension stores cannot display the panel.
 
 ## Getting Started
 
 For first-time setup: click the toolbar icon to open the panel → click ⚙ → choose a provider and
 enter your API key → click "Done".
-You can also configure it directly on the extension's Preferences page
-(`about:addons` → this extension → Preferences). Both locations share the same settings.
+You can also open `chrome://extensions` or `edge://extensions` → this extension → "Details" →
+"Extension options". Both locations share the same settings.
 
 ## Features
 
@@ -77,8 +91,8 @@ You can also configure it directly on the extension's Preferences page
   Qwen / Zhipu / OpenRouter / local Ollama all work. Your browser sends requests directly to the
   endpoint you specify. **Your key is stored only on your device**, with no intermediary.
 - **The interface language follows your browser**: Chinese is used when
-  `browser.i18n.getUILanguage()` returns Chinese; English is used for all other languages.
-  If unavailable, it falls back to `navigator.language`. For content scripts, the background page
+  `chrome.i18n.getUILanguage()` returns Chinese; English is used for all other languages.
+  If unavailable, it falls back to `navigator.language`. For content scripts, the background service worker
   sends this value along with the panel state, because content scripts may not have i18n access.
   **The conversation language follows it too**: default prompts use the current language.
   In an English-language browser, the default assistant prompt asks it to "write them in English",
@@ -90,8 +104,8 @@ You can also configure it directly on the extension's Preferences page
   `✦ Enable instant questions` button appears at the top of the form. Clicking it turns it solid
   green and changes its label to `✦ Instant questions · On`, with a short description of the current
   behavior below. Click again to return to "show a button after selecting text; send only when
-  clicked". This button, the "Ask on selection" dropdown below it, and the round button at the
-  bottom right on Android all control **the same setting and stay in sync**. The buttons switch
+  clicked". This button and the "Ask on selection" dropdown below it control
+  **the same setting and stay in sync**. The button switches
   only between these two modes. To disable selection questions entirely, so selecting text does
   nothing, choose "Completely off" in the dropdown.
 - **Ask about selected text**: select text on any web page and a green button appears beside it.
@@ -199,7 +213,7 @@ You can also configure it directly on the extension's Preferences page
 - **Context has changed from "the current page's PDF text" to "the paragraph containing the
   selection"**, with an option to use the full page text. The page title and URL are included
   to help the model understand what you are reading.
-- **Settings are stored in `browser.storage.local`**. The panel reads the same settings on every
+- **Settings are stored in `chrome.storage.local`**. The panel reads the same settings on every
   page; keys are no longer stored separately for each site.
 - **Only plain data is saved for settings and conversations**. For streaming updates, the panel
   attaches DOM nodes to message objects in memory. DOM nodes cannot be structured-cloned, so saving
@@ -216,11 +230,11 @@ You can also configure it directly on the extension's Preferences page
 
 - **Requires `host_permissions: <all_urls>`**: the extension needs to send requests to arbitrary
   providers or self-hosted proxies and inject the panel and selection button into arbitrary pages,
-  so its permissions are broad. Firefox explicitly notifies you of this when you install it.
-- **Subject to the target service's CORS policy**: requests originate from the background page,
+  so its permissions are broad. The browser notifies you of this when you install it.
+- **Subject to the target service's CORS policy**: requests originate from the background service worker,
   not the web page, so the page's CORS restrictions normally do not apply. If a provider rejects
   direct browser connections, however, you will see "Cannot connect to this endpoint".
-- **No panel on restricted pages**: injection is not possible on `about:`, `chrome://`, add-on
+- **No panel on restricted pages**: injection is not possible on `chrome://`, `edge://`, add-on
   store pages, and similar restricted pages. For tabs already open before installation, the first
   toolbar click **injects the content scripts on demand**; they then work normally.
 - **Sites with strict CSP**: panel styles load from the extension's CSS through a `<link>` inside
@@ -249,13 +263,14 @@ You can also configure it directly on the extension's Preferences page
 
 | Path | Purpose |
 | --- | --- |
-| `manifest.json` | MV3 manifest: background page, content scripts, toolbar button, and options page |
+| `manifest.json` | Chrome / Edge MV3 manifest: service worker, content scripts, toolbar button, and options page |
 | `src/shared/ai.js` | Port of Reader's `src/lib/ai.js`: providers, thinking toggles, prompts, and streaming client |
 | `src/shared/i18n.js` | Interface and conversation language: zh/en string tables selected by browser language; must load first in every host |
 | `src/shared/math.js` | LaTeX extraction: replace formulas with placeholders and restore them after rendering; edge cases covered by `test/logic.test.js` |
 | `src/shared/markdown.js` | Port of Reader's `src/lib/markdown.js`: marked + DOMPurify |
 | `src/shared/store.js` | Port of Reader's `src/lib/chat-storage.js`: settings/message persistence and normalization |
-| `src/background.js` | Background event page: requests that bypass page CORS, streaming responses, toolbar button, and per-tab panel state |
+| `src/background.js` | Shared background: requests that bypass page CORS, streaming responses, toolbar button, and per-tab panel state |
+| `src/background-worker.js` | Chrome / Edge service worker entry point that loads the shared background modules in order |
 | `src/content/content.js` | Content script: shadow root, selection detection, floating "Ask AI" button, page context extraction, and Esc to hide |
 | `src/content/panel.js` | Chat panel and settings form: DOM rewrites of Reader's `ChatPanel.vue`/`ChatSettingsForm.vue` |
 | `src/content/panel.css` | Panel styles, loaded inside the shadow root and reused by the options page |
@@ -267,65 +282,8 @@ You can also configure it directly on the extension's Preferences page
 | `icons/` | Icons: `icon.svg` is the source; `icon-*.png` files are generated from it |
 
 **Plain DOM and vanilla JavaScript**. Logic in `ai.js` / `store.js` / `markdown.js` is shared
-between the background page and content scripts as classic scripts attached to `globalThis`.
+between the background service worker and content scripts as classic scripts attached to `globalThis`.
 `node --check` and the tests below are sufficient for code checks.
-
-# Android (Firefox for Android)
-
-On Android, the interface and settings are arranged differently from desktop: web pages contain
-only a content card and a row of round buttons, while **settings have their own page**.
-
-## How to Use
-
-- **Tap the extension icon to open settings**: on Android, the toolbar icon opens the settings
-  page directly instead of toggling the panel. On desktop, it still toggles the floating panel.
-- **The round button at the bottom right toggles "send on selection"**: dark green means selected
-  text is sent immediately; a light background means selecting text first shows an "Ask AI" button,
-  and sending happens only when you tap it. The latter is the default. Tap to switch modes;
-  **press and hold to open the content card**. The collapsed card has no title bar, so open it
-  by holding the button, or let it open automatically when the AI responds.
-- **The content card does not open the keyboard automatically**: opening it from a selection
-  does not focus the input box, because the keyboard would cover the answer. Tap the input when
-  you want to type. On desktop, opening the panel still focuses the input.
-- **The content card at the bottom left** contains only the conversation and input area,
-  with **no title bar**, so there is no dragging to move or resize it. The round ✕ button outside
-  its upper-right corner hides it. The card grows upward from the bottom of the screen until it
-  reaches "Maximum card height", then scrolls internally.
-- **The input area can collapse**: tap the small arrow at its top left to collapse or expand
-  the input row. This state shares the same setting as desktop.
-- **"Ask AI" appears after selecting text**: long-press text selection on mobile does not trigger
-  `mouseup`, so selection detection follows `selectionchange` / `touchend`. After selecting,
-  wait briefly for the small green button to appear beside the selection, then tap it to ask.
-
-## Android-Specific Settings
-
-The "Android settings" section appears only on Android and is hidden on desktop:
-
-| Setting | Purpose | Default |
-| --- | --- | --- |
-| **Maximum card height (px)** | The card grows upward from the bottom of the screen to this height, then scrolls internally. Range: 160–2000; if the screen is shorter, the screen height takes precedence. | 220 |
-| **Show my sent content in the card** | Turn this off to show only AI answers in the card and hide the messages sent when asking about selections. The settings page still shows the full conversation. | On |
-
-Both are stored in `browser.storage.local` as `panelMaxHeight` / `showSentContent`.
-Changes take effect immediately without reloading the page.
-
-## Settings Page and Content Card
-
-- **Settings page**: API key, provider, model, temperature, thinking mode, both prompt sets,
-  selection questions and actions, and the two Android settings above. It uses the same settings
-  and page implementation as the desktop panel's ⚙ view.
-- **Content card**: only for reading answers and asking questions. It stays at the bottom of the
-  screen, cannot be dragged or resized, and never writes `panelRect`.
-- Both share the same storage: changes on the settings page immediately affect the in-page card,
-  and vice versa. The round button at the bottom right and the `✦` button on the settings page
-  control the same switch with the same two meanings: green sends on selection; light shows
-  a button first. Both stay in sync.
-
-## Android Test Command
-
-```sh
-web-ext run --target=firefox-android --android-device=DEVICE_ID --firefox-apk=org.mozilla.firefox --firefox-apk-component=org.mozilla.firefox.AppMomo
-```
 
 ## Icon Design
 
@@ -345,7 +303,7 @@ No npm install is needed:
 ```sh
 node test/logic.test.js       # Pure logic: providers, thinking toggles, key slots, prompts, message limits, etc.
 node test/panel.test.js       # Panel, settings, streaming turns, selection → button → question, dragging/resizing, Esc
-node test/background.test.js  # Background: per-tab panel state
+node test/background.test.js  # Chrome / Edge worker: state, messaging, injection, streams, keep-alive cleanup
 ```
 
 `panel.test.js` uses a small handwritten DOM with real capture/bubble and `stopPropagation`
@@ -354,22 +312,34 @@ semantics, plus a fake WebExtension port, to run the **real** `panel.js` / `cont
 dragging to reposition and ending a drag on release, saving/restoring position and size,
 Esc to hide, open/closed state, the instant-question toggle, synchronization across interfaces,
 and regressions such as ensuring persisted messages contain only plain data.
-`background.test.js` uses stubs to cover per-tab panel state, including cleanup when tabs close.
+All tests provide only the `chrome` API. `background.test.js` runs a Chromium worker without a DOM,
+covering asynchronous replies, state across background restarts, on-demand injection, and
+keep-alive cleanup after completion, errors, cancellation, and disconnection.
 These tests **do not cover** styling in a real browser, DOMPurify's sanitization results,
-or Shadow DOM behavior; those three areas require a manual check in Firefox.
+or Shadow DOM behavior; those three areas require a manual check in each target browser.
 
-The extension itself is validated with
+This adaptation was exercised in Chromium 152: loading, options, panel state restoration,
+streaming replies, Markdown / LaTeX, saved history, and cancellation. With the worker debugger
+detached, a local mock endpoint taking 35 seconds to return response headers also completed.
+Edge has not been tested separately in a real browser.
+
+For packaging and supplementary static checks, use
 [`web-ext`](https://extensionworkshop.com/documentation/develop/getting-started-with-web-ext/).
-`web-ext-config.mjs` already excludes tests and documentation from the package:
+`web-ext-config.mjs` configures packaging exclusions:
 
 ```sh
-nix-shell -p nodejs web-ext --run 'web-ext lint'      # 0 errors
+nix-shell -p nodejs web-ext --run 'web-ext lint'      # Firefox static checks; see limitations below
 nix-shell -p nodejs web-ext --run 'web-ext build'     # Package as a zip
 ```
 
-`web-ext lint` currently reports only two `UNSAFE_VAR_ASSIGNMENT` notices: one from DOMPurify
-itself, and one from inserting **sanitized** Markdown output into `innerHTML` only after
-`DOMPurify.sanitize` has run.
+`web-ext lint` targets Firefox. This branch reports two Firefox compatibility errors,
+`BACKGROUND_SERVICE_WORKER_NOFALLBACK` and `ADDON_ID_REQUIRED`, plus a warning about Firefox's
+data collection declaration and two `UNSAFE_VAR_ASSIGNMENT` warnings from DOMPurify and
+inserting sanitized Markdown through `innerHTML`.
+It cannot replace loading the extension in Chrome / Edge. After changes,
+check the extension management page for errors, then verify the toolbar toggle, selection
+questions, saved settings, streaming replies, and cancellation. Extract a packaged zip before
+loading it locally.
 
 ## License
 

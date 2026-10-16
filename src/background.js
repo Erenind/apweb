@@ -1,4 +1,4 @@
-// Background event page.
+// Chrome / Edge background service worker.
 //
 // It exists for two reasons:
 //   1. The chat request runs here, not in the page. A content script's fetch()
@@ -47,6 +47,14 @@
     const controller = new AbortController()
     controllers.set(id, controller)
 
+    // An open port alone does not keep a Chromium worker alive. Touch an API
+    // while waiting for tokens, and let it sleep again as soon as this chat ends.
+    const keepAlive = setInterval(() => {
+      void api.runtime.getPlatformInfo().catch(() => {})
+    }, 25000)
+    const stopKeepAlive = () => clearInterval(keepAlive)
+    controller.signal.addEventListener('abort', stopKeepAlive, { once: true })
+
     const post = (payload) => {
       try {
         port.postMessage(payload)
@@ -73,24 +81,33 @@
       if (error?.name === 'AbortError') post({ t: 'aborted', id })
       else post({ t: 'error', id, message: error?.message ?? String(error) })
     } finally {
+      stopKeepAlive()
+      controller.signal.removeEventListener('abort', stopKeepAlive)
       controllers.delete(id)
     }
   }
 
   /* ------------------------------ message routing ---------------------------- */
 
-  api.runtime.onMessage.addListener((message, sender) => {
+  api.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || typeof message !== 'object') return undefined
-    if (message.t === 'apweb:panel-state') return readPanelState(sender)
-    if (message.t === 'apweb:set-panel-state') return writePanelState(sender, message.open === true)
-    return undefined
+    let response
+    if (message.t === 'apweb:panel-state') response = readPanelState(sender)
+    else if (message.t === 'apweb:set-panel-state') {
+      response = writePanelState(sender, message.open === true)
+    } else return undefined
+
+    // Chrome versions without Promise-returning listeners require this callback
+    // and a literal true to keep the reply channel open.
+    void response.then(sendResponse)
+    return true
   })
 
   /* ------------------------------- panel state ------------------------------- */
 
   // Whether the floating panel is showing, per tab: a new tab starts closed, while
   // navigating inside a tab keeps the state you left. Kept in storage.session so
-  // it survives the background event page being suspended; tabs that close are
+  // it survives the background service worker being suspended; tabs that close are
   // swept out.
   function stateKey(sender) {
     const tabId = sender?.tab?.id
@@ -99,7 +116,7 @@
 
   async function readPanelState(sender) {
     const key = stateKey(sender)
-    // The language rides along: the background page always has i18n access, while
+    // The language rides along: the background worker always has i18n access, while
     // a content script may not, and the panel needs it before it builds anything.
     const language = i18n?.language?.() ?? null
     if (!key || !api.storage?.session) return { open: false, language }
@@ -183,15 +200,9 @@
     try {
       await api.scripting.executeScript({
         target: { tabId },
-        files: [
-          'vendor/marked.umd.js',
-          'vendor/purify.min.js',
-          'src/shared/ai.js',
-          'src/shared/markdown.js',
-          'src/shared/store.js',
-          'src/content/panel.js',
-          'src/content/content.js',
-        ],
+        // Keep on-demand injection identical to automatic injection, including
+        // localisation and math dependencies, in their declared load order.
+        files: api.runtime.getManifest().content_scripts[0].js,
       })
     } catch {
       // Restricted page or missing permission: nothing more to do.

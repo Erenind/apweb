@@ -2,23 +2,12 @@
   "manifest_version": 3,
   "name": "网页 AI 助手（划词问答）",
   "version": "0.1.0",
+  "minimum_chrome_version": "121",
   "description": "把 AI 对话和划词提问带到任意网页。OpenAI 兼容接口，key 只存本机浏览器。",
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "apweb@local",
-      "strict_min_version": "140.0",
-      "data_collection_permissions": {
-        "required": ["none"]
-      }
-    },
-    "gecko_android": {
-      "strict_min_version": "142.0"
-    }
-  },
   "permissions": ["storage", "scripting"],
   "host_permissions": ["<all_urls>"],
   "background": {
-    "scripts": ["src/shared/i18n.js", "src/shared/ai.js", "src/background.js"]
+    "service_worker": "src/background-worker.js"
   },
   "content_scripts": [
     {

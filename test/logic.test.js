@@ -6,7 +6,7 @@ const ROOT = require('path').join(__dirname, '..')
 
 // --- stub the WebExtension storage API -------------------------------------
 const storage = {}
-globalThis.browser = {
+globalThis.chrome = {
   // The panel follows the browser's UI language; the suite pins it to Chinese and
   // exercises the English table explicitly.
   i18n: { getUILanguage: () => 'zh-CN' },
@@ -496,7 +496,11 @@ function eq(name, actual, expected) {
       )
     }
     check('i18n loads before ai.js/store.js in the content script', loadsFirst(manifest.content_scripts[0].js))
-    check('…and in the background page', loadsFirst(manifest.background.scripts))
+    check('the manifest uses only a service worker background',
+      typeof manifest.background.service_worker === 'string' &&
+      !('scripts' in manifest.background) && !('page' in manifest.background))
+    check('the manifest contains no Firefox-specific settings',
+      !('browser_specific_settings' in manifest))
     const optionsHtml = fs.readFileSync(`${ROOT}/src/options/options.html`, 'utf8')
     check(
       '…and in the options page',
