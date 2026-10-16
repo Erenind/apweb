@@ -52,6 +52,36 @@
   box-sizing: border-box;
 }
 
+/* Scrollbars. Nothing outside can style these — the panel lives in a ShadowRoot, so
+   the page's own rules never reach it — and Chromium's default bar is ~15px wide, a
+   third of a 380px panel. These pseudo-elements are what make it 6px instead; they
+   are ignored by Firefox, which has its own controls in the block below. */
+.apweb-scope ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.apweb-scope ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.apweb-scope ::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: var(--ap-border-hover);
+}
+
+/* Firefox. Deliberately inside a feature query: a Chromium that understands
+   `scrollbar-width` starts ignoring `::-webkit-scrollbar` as soon as it is set, and
+   Chromium's `thin` is still ~11px — the 6px bar above is what we want there. Both
+   properties are inherited, so they cover the transcript, the settings form, code
+   blocks and wide tables alike. */
+@supports (-moz-appearance: none) {
+  .apweb-scope {
+    scrollbar-width: thin;
+    scrollbar-color: var(--ap-border-hover) transparent;
+  }
+}
+
 /* ------------------------------- the panel -------------------------------- */
 
 .apweb-panel {

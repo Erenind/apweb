@@ -533,6 +533,22 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   // Comments discuss these values by name, so match against the declarations only.
   const panelRules = panelCss.replace(/\/\*[\s\S]*?\*\//g, '')
   check('panel styles use absolute px, never rem', !/\d\s*rem\b/.test(panelRules))
+  // Chromium's default scrollbar is ~15px wide, which dwarfs a 380px panel — and
+  // nothing outside can restyle it, because the panel lives in a ShadowRoot. The
+  // pseudo-elements give Chromium a 6px bar; Firefox is asked for its own thin one
+  // inside a feature query, because Chromium drops the pseudo-elements as soon as
+  // `scrollbar-width` is set.
+  const webkitBar = panelRules.match(/\.apweb-scope ::-webkit-scrollbar\s*\{([^}]*)\}/)?.[1] ?? ''
+  check(
+    'Chromium gets a 6px scrollbar',
+    /width:\s*6px/.test(webkitBar) && /height:\s*6px/.test(webkitBar),
+  )
+  const firefoxBar =
+    panelRules.match(/@supports \(-moz-appearance: none\)\s*\{\s*\.apweb-scope\s*\{([^}]*)\}/)?.[1] ?? ''
+  check(
+    'and Firefox is asked for a thin one',
+    /scrollbar-width:\s*thin/.test(firefoxBar) && /scrollbar-color:/.test(firefoxBar),
+  )
   // U+2303/U+2304 are missing from plenty of fonts, which made the fold arrow
   // disappear; it is drawn from borders instead.
   const panelJs = fs.readFileSync(`${ROOT}/src/content/panel.js`, 'utf8')
