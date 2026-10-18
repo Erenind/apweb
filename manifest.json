@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "网页 AI 助手（划词问答）",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "把 AI 对话和划词提问带到任意网页。OpenAI 兼容接口，key 只存本机浏览器。",
   "browser_specific_settings": {
     "gecko": {
