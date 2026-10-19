@@ -40,14 +40,20 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 ## 安装
 ### Edge（桌面版 121+）
 
-1. 下载并解压本仓库的 `chrome_edge` 分支，或克隆后切换到该分支。
+1. 下载并解压本仓库的 `chrome_edge` 分支。
+```sh
+git clone -b chrome_edge https://github.com/erenind/apweb
+```
 2. 打开 `edge://extensions`，开启「开发人员模式」。
 3. 点「加载解压缩的扩展」，选择包含 **`manifest.json`** 的仓库根目录。
 4. 将扩展固定到工具栏，打开普通网页，点击扩展图标。
 
 ### Chrome（桌面版 121+）
 
-1. 下载并解压本仓库的 `chrome_edge` 分支，或克隆后切换到该分支。
+1. 下载并解压本仓库的 `chrome_edge` 分支。
+```sh
+git clone -b chrome_edge https://github.com/erenind/apweb
+```
 2. 打开 `chrome://extensions`，开启「开发者模式」。
 3. 点「加载已解压的扩展程序」，选择包含 **`manifest.json`** 的仓库根目录。
 4. 将扩展固定到工具栏，打开普通网页，点击扩展图标。
