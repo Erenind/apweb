@@ -25,7 +25,7 @@ Load locally: `about:debugging` → 临时载入附加组件 → `manifest.json`
 ## Coding Style & Naming Conventions
 
 - Two-space indent, no semicolons, single quotes, ~100 column lines, `const` by default.
-- Comments explain *why*, in English. User-facing strings live only in `src/shared/i18n.js` (`zh`/`en` by browser language); a test fails on CJK elsewhere in `src/`.
+- Comments explain *why*, in English. In-app strings live in `src/shared/i18n.js` (`zh`/`en` by browser language); everything the *browser* shows before our scripts run — the installed name, description, toolbar tooltip and the static settings page — comes from `_locales/{en,zh_CN}/messages.json` (referenced as `__MSG_*__` in `manifest.json`). A test fails on CJK elsewhere in `src/` and on hardcoded Chinese in `src/options/options.html`.
 - `camelCase` functions/variables, `SCREAMING_SNAKE_CASE` module constants, `apweb-` prefixed CSS classes.
 - Settings controls expose a `data-field="kebab-case"` attribute; tests select by it.
 - **No `eval`, no ES modules**: the CSP forbids eval and content scripts are classic scripts; keep DOM code plain.

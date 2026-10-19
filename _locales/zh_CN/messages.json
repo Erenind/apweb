@@ -1,0 +1,25 @@
+{
+  "extensionName": {
+    "message": "网页 AI 助手（划词问答）",
+    "description": "Shown in the browser's extension list and on the store page."
+  },
+  "extensionDescription": {
+    "message": "把 AI 对话和划词提问带到任意网页。OpenAI 兼容接口，key 只存本机浏览器。"
+  },
+  "actionTitle": {
+    "message": "AI 助手（划词问答）"
+  },
+  "optionsPageTitle": {
+    "message": "网页 AI 助手 · 设置"
+  },
+  "optionsTitle": {
+    "message": "网页 AI 助手"
+  },
+  "optionsIntro": {
+    "message": "这里的设置对整个浏览器生效。请求由浏览器直接发往你填的接口地址，key 只存在本机 browser.storage.local，不经过任何中转。"
+  },
+  "uiLang": {
+    "message": "zh-CN",
+    "description": "BCP 47 tag for the <html lang> attribute; must match the locale of this file."
+  }
+}

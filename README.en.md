@@ -94,6 +94,8 @@ You can also open `chrome://extensions` or `edge://extensions` → this extensio
   `chrome.i18n.getUILanguage()` returns Chinese; English is used for all other languages.
   If unavailable, it falls back to `navigator.language`. For content scripts, the background service worker
   sends this value along with the panel state, because content scripts may not have i18n access.
+  The extension name, store description, toolbar tooltip and the settings page's intro come from
+  `_locales/` (`en` / `zh_CN`), so an English install shows an English name and settings page.
   **The conversation language follows it too**: default prompts use the current language.
   In an English-language browser, the default assistant prompt asks it to "write them in English",
   and the default selection action becomes "Explain and translate".
@@ -275,6 +277,7 @@ You can also open `chrome://extensions` or `edge://extensions` → this extensio
 | `src/content/panel.js` | Chat panel and settings form: DOM rewrites of Reader's `ChatPanel.vue`/`ChatSettingsForm.vue` |
 | `src/content/panel.css` | Panel styles, loaded inside the shadow root and reused by the options page |
 | `src/options/options.html` | Preferences page: reuses the same panel |
+| `_locales/` | Browser-level strings: extension name, store description, toolbar tooltip, settings-page title and intro (`en` / `zh_CN`, referenced as `__MSG_*__` from `manifest.json`) |
 | `test/` | Three tests with no dependencies, using Node.js built-ins; see "Testing" below |
 | `web-ext-config.mjs` | Ignore list for `web-ext lint` / `build`, excluding tests and documentation from the package |
 | `LICENSE` | [PolyForm Noncommercial 1.0.0](LICENSE): free for noncommercial use; commercial use requires separate permission |

@@ -506,6 +506,56 @@ function eq(name, actual, expected) {
       '…and in the options page',
       optionsHtml.indexOf('shared/i18n.js') < optionsHtml.indexOf('shared/ai.js'),
     )
+
+    // Everything the browser shows *before* our scripts run — the installed name,
+    // the description and the toolbar tooltip — has to come from `_locales`; a
+    // hardcoded name is why an English install still said 网页 AI 助手.
+    const locales = ['en', 'zh_CN']
+    const messages = Object.fromEntries(
+      locales.map((locale) => [
+        locale,
+        JSON.parse(fs.readFileSync(`${ROOT}/_locales/${locale}/messages.json`, 'utf8')),
+      ]),
+    )
+    eq('the manifest declares a default locale', manifest.default_locale, 'en')
+    eq(
+      'both locales carry the same keys',
+      Object.keys(messages.en).sort(),
+      Object.keys(messages.zh_CN).sort(),
+    )
+    for (const key of ['name', 'description']) {
+      const msgKey = manifest[key]?.match(/^__MSG_(\w+)__$/)?.[1]
+      check(`manifest ${key} is localised`, Boolean(msgKey))
+      check(
+        `…and every locale has ${msgKey}`,
+        Boolean(msgKey) && locales.every((locale) => messages[locale][msgKey]?.message),
+      )
+    }
+    const actionKey = manifest.action?.default_title?.match(/^__MSG_(\w+)__$/)?.[1]
+    check('the toolbar title is localised', Boolean(actionKey))
+    check(
+      '…and every locale has it',
+      Boolean(actionKey) && locales.every((locale) => messages[locale][actionKey]?.message),
+    )
+
+    // The settings page is static HTML, so its text cannot come from AII18n like the
+    // panel's does: it is filled from `_locales` in options.js instead.
+    const optionsKeys = [...optionsHtml.matchAll(/data-i18n="([^"]+)"/g)].map((match) => match[1])
+    check('the settings page uses localised strings', optionsKeys.length >= 2)
+    check(
+      'every settings-page key exists in every locale',
+      optionsKeys.every((key) => locales.every((locale) => messages[locale][key]?.message)),
+    )
+    eq(
+      'each locale states the language it is written in',
+      [messages.en.uiLang?.message, messages.zh_CN.uiLang?.message],
+      ['en', 'zh-CN'],
+    )
+    check('the settings page has no hardcoded Chinese', !/[\u4e00-\u9fff]/.test(optionsHtml))
+    check(
+      'the options script applies the messages',
+      /data-i18n/.test(fs.readFileSync(`${ROOT}/src/options/options.js`, 'utf8')),
+    )
   }
 
   console.log(failures ? `\n${failures} FAILURE(S)` : '\nall checks passed')

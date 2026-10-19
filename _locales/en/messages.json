@@ -1,0 +1,25 @@
+{
+  "extensionName": {
+    "message": "Web AI Assistant (Ask on Select)",
+    "description": "Shown in the browser's extension list and on the store page."
+  },
+  "extensionDescription": {
+    "message": "AI chat and ask-on-select on any web page. Works with OpenAI-compatible endpoints; the key stays in this browser."
+  },
+  "actionTitle": {
+    "message": "AI Assistant (Ask on Select)"
+  },
+  "optionsPageTitle": {
+    "message": "Web AI Assistant · Settings"
+  },
+  "optionsTitle": {
+    "message": "Web AI Assistant"
+  },
+  "optionsIntro": {
+    "message": "These settings apply to the whole browser. Requests go straight from the browser to the endpoint you enter. The key is kept only in this browser (browser.storage.local) and never goes through a relay."
+  },
+  "uiLang": {
+    "message": "en",
+    "description": "BCP 47 tag for the <html lang> attribute; must match the locale of this file."
+  }
+}

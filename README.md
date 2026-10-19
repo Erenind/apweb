@@ -94,7 +94,9 @@ Chrome / Edge 共用划词提问、流式回复、Markdown / LaTeX、设置和�
 - **API请求**: 走 **OpenAI 兼容**协议，所以 DeepSeek / OpenAI / Moonshot / 通义 / 智谱 / OpenRouter / 本地 Ollama 都能用。请求由浏览器直接发往你填的接口地址，**key 只存在本机**，不经过任何中转。
 - **界面语言跟随浏览器**：`chrome.i18n.getUILanguage()` 是中文就用中文，其它一律用英文
   （取不到时退回 `navigator.language`；内容脚本里这一项由后台 Service Worker 随面板状态一起下发，
-  因为内容脚本不一定有 i18n 权限）。**对话语言也跟着走**：默认提示词就是按当前语言发的，
+  因为内容脚本不一定有 i18n 权限）。扩展名、商店描述、工具栏提示和设置页顶部的说明来自
+  `_locales/`（`en` / `zh_CN`），所以英文浏览器里安装后显示的是英文名，设置页也不会有中文。
+  **对话语言也跟着走**：默认提示词就是按当前语言发的，
   英文浏览器里默认助手会要求"write them in English"，划词默认动作也变成英文的
   "Explain and translate"。你自己改过的提示词不会被覆盖——只有仍是**出厂原文**的那些
   才会在语言切换时跟着换。没有面板内的语言开关，改语言就改浏览器语言。
@@ -227,6 +229,7 @@ Chrome / Edge 共用划词提问、流式回复、Markdown / LaTeX、设置和�
 | `src/content/panel.js` | 对话面板 + 设置表单（Reader `ChatPanel.vue`/`ChatSettingsForm.vue` 的 DOM 重写） |
 | `src/content/panel.css` | 面板样式（影子根里加载，选项页也复用） |
 | `src/options/options.html` | 首选项页：复用同一个面板 |
+| `_locales/` | 浏览器层文案：扩展名、商店描述、工具栏提示、设置页标题与说明（`en` / `zh_CN`，`manifest.json` 里用 `__MSG_*__` 引用） |
 | `test/` | 三个零依赖测试（node 内置模块），见下面「验证」 |
 | `web-ext-config.mjs` | `web-ext lint` / `build` 的忽略清单（把测试和文档排除在打包外） |
 | `LICENSE` | [PolyForm Noncommercial 1.0.0](LICENSE)：非商业免费，商业使用需另行授权 |
