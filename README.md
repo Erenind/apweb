@@ -53,14 +53,29 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 > 想长期使用可以打包成 `.zip` 后用开发者版签名，或直接在这个页面继续临时加载。
 
 
-### edge
-🕳
+### edge & chrome
+**上线进度**：
+正在注册成为开发者
 
-### chrome
-🕳
+**临时加载**：
+适配插件位于`chrome_edge`分支
+
+1. 获取插件
+```sh
+git clone -b chrome_edge https://github.com/erenind/apweb
+```
+2. 开扩展管理页面
+	- Chrome 浏览器：在地址栏输入 chrome://extensions/ 并回车。
+  - Edge 浏览器：在地址栏输入 edge://extensions/ 并回车。
+3. 开启开发者模式
+	- 在页面右上角（Chrome）或左下角/右上角（Edge），找到并开启“开发者模式”（Developer mode）开关。
+4. 加载扩展程序
+	- 点击页面上新出现的“加载已解压的扩展程序”（Load unpacked）按钮。
+	- 在弹出的文件选择框中，选中你解压好的插件根目录文件夹（即直接包含 manifest.json 的那一层目录，不要选进下一级子文件夹）并点击选择。
 
 ### safari
-🕳
+上线进度：
+正在注册成为开发者
 
 ## 首次使用
 第一次使用：点工具栏上的图标打开面板 → 点 ⚙ → 选服务商、填 API Key → 「完成」。
