@@ -17,17 +17,14 @@
 
 ## [To English README](README.en.md)
 
-## 电脑端演示视频
+## 演示视频
 
 ### 解释万物
 https://github.com/user-attachments/assets/bc1f69f5-f8a5-4b61-b212-e5975ba94816
 ### AI翻译
 https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
-
-
-## 手机端演示视频
-
-
+### 手机版
+https://github.com/user-attachments/assets/d693149c-0790-4e9b-ae37-a08bd8573a2a
 
 ## 提示
 - 回答质量与提示词和ai模型有关。
@@ -66,7 +63,7 @@ git clone -b chrome_edge https://github.com/erenind/apweb
 ```
 2. 打开扩展管理页面
 	- Chrome 浏览器：在地址栏输入 chrome://extensions/ 并回车。
-  - Edge 浏览器：在地址栏输入 edge://extensions/ 并回车。
+	- Edge 浏览器：在地址栏输入 edge://extensions/ 并回车。
 3. 开启开发者模式
 	- 在页面右上角（Chrome）或左下角/右上角（Edge），找到并开启“开发者模式”（Developer mode）开关。
 4. 加载扩展程序
