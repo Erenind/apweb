@@ -64,7 +64,7 @@ https://github.com/user-attachments/assets/a72f4cf9-48de-4088-9aea-c83c496f4c6b
 ```sh
 git clone -b chrome_edge https://github.com/erenind/apweb
 ```
-2. 开扩展管理页面
+2. 打开扩展管理页面
 	- Chrome 浏览器：在地址栏输入 chrome://extensions/ 并回车。
   - Edge 浏览器：在地址栏输入 edge://extensions/ 并回车。
 3. 开启开发者模式
@@ -74,11 +74,10 @@ git clone -b chrome_edge https://github.com/erenind/apweb
 	- 在弹出的文件选择框中，选中你解压好的插件根目录文件夹（即直接包含 manifest.json 的那一层目录，不要选进下一级子文件夹）并点击选择。
 
 ### safari
-上线进度：
-正在注册成为开发者
+**上线进度**：正在注册成为开发者
 
 ## 首次使用
-第一次使用：点工具栏上的图标打开面板 → 点 ⚙ → 选服务商、填 API Key → 「完成」。
+点工具栏上的图标打开面板 → 点 ⚙ → 选服务商、填 API Key → 「完成」。
 也可以直接在扩展的「首选项」页里配置（`about:addons` → 本扩展 → 首选项），两处是同一份设置。
 
 ## 功能说明
