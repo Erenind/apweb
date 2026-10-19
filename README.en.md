@@ -89,6 +89,8 @@ You can also configure it directly on the extension's Preferences page
   `browser.i18n.getUILanguage()` returns Chinese; English is used for all other languages.
   If unavailable, it falls back to `navigator.language`. For content scripts, the background page
   sends this value along with the panel state, because content scripts may not have i18n access.
+  The extension name, store description, toolbar tooltip and the settings page's intro come from
+  `_locales/` (`en` / `zh_CN`), so an English install shows an English name and settings page.
   **The conversation language follows it too**: default prompts use the current language.
   In an English-language browser, the default assistant prompt asks it to "write them in English",
   and the default selection action becomes "Explain and translate".
@@ -261,6 +263,7 @@ You can also configure it directly on the extension's Preferences page
 | `manifest.json` | MV3 manifest: background page, content scripts, toolbar button, and options page |
 | `src/shared/ai.js` | Port of Reader's `src/lib/ai.js`: providers, thinking toggles, prompts, and streaming client |
 | `src/shared/i18n.js` | Interface and conversation language: zh/en string tables selected by browser language; must load first in every host |
+| `_locales/` | Browser-level strings: extension name, store description, toolbar tooltip, settings-page title and intro (`en` / `zh_CN`, referenced as `__MSG_*__` from `manifest.json`) |
 | `src/shared/math.js` | LaTeX extraction: replace formulas with placeholders and restore them after rendering; edge cases covered by `test/logic.test.js` |
 | `src/shared/markdown.js` | Port of Reader's `src/lib/markdown.js`: marked + DOMPurify |
 | `src/shared/store.js` | Port of Reader's `src/lib/chat-storage.js`: settings/message persistence and normalization |

@@ -701,7 +701,7 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   // off = 选中后先弹出按钮 ('click'). The two can never disagree.
   modeBtn.dispatch('click', {})
   check('the toggle falls back to the button mode', AIStore.state.settings.selectionTrigger === 'click')
-  check('toggle label changes', modeBtn.textContent.includes('选中即发送'))
+  check('toggle label changes', modeBtn.textContent === globalThis.AII18n.STRINGS.zh.modeOff)
   check('the select follows it immediately', triggerSelectEl.value === 'click')
   check('划词用途 stays live', actionSelectEl.disabled === false)
   check('the hint describes the button', panel.el.querySelector('.apweb-mode__hint').textContent.includes('小按钮'))
