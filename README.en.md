@@ -15,22 +15,13 @@
 
 ## [Chinese README](README.md)
 
-## Desktop Demo Videos
-
+## Demo Videos
 ### Explain Anything
-
-
 https://github.com/user-attachments/assets/a16d46de-6ed9-4f4e-83b3-02c055312408
-
-
 ### AI Translation
-
-
 https://github.com/user-attachments/assets/bc63238f-fb14-42c2-8094-2c286b54416c
-
-
-
-## Mobile Demo Videos
+### Mobile Demo Videos
+https://github.com/user-attachments/assets/74ab2483-1e7d-4d19-a7dd-4e67cf75163e
 
 ## Tips
 
