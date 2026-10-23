@@ -9,6 +9,9 @@
   "actionTitle": {
     "message": "AI Assistant (Ask on Select)"
   },
+  "toggleSelectionShortcut": {
+    "message": "Toggle between instant questions and the selection button"
+  },
   "optionsPageTitle": {
     "message": "Web AI Assistant · Settings"
   },

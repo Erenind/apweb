@@ -18,6 +18,8 @@
   const api = globalThis.browser ?? globalThis.chrome
   const PORT_NAME = 'apweb-ai'
   const PANEL_STATE_PREFIX = 'apweb.panel.'
+  const SETTINGS_KEY = 'apweb.ai.settings'
+  const TOGGLE_SELECTION_COMMAND = 'toggle-selection-trigger'
 
   api.runtime.onConnect.addListener((port) => {
     if (port.name !== PORT_NAME) return
@@ -178,6 +180,42 @@
       }
     }
   })
+
+  /* --------------------------- selection shortcut ---------------------------- */
+
+  // The shortcut changes the same persisted setting as the ✦ button and the
+  // select below it. Storage then broadcasts the change to every page and the
+  // options page. A full-off mode has no third shortcut state: like the button,
+  // the shortcut turns it on in 'auto' mode.
+  let selectionToggle = Promise.resolve()
+
+  api.commands?.onCommand.addListener((command) => {
+    if (command !== TOGGLE_SELECTION_COMMAND) return undefined
+    selectionToggle = selectionToggle.then(toggleSelectionTrigger).catch(() => {})
+    return selectionToggle
+  })
+
+  async function toggleSelectionTrigger() {
+    if (!api.storage?.local) return
+
+    let settings = {}
+    try {
+      const stored = await api.storage.local.get(SETTINGS_KEY)
+      const value = stored?.[SETTINGS_KEY]
+      if (value && typeof value === 'object' && !Array.isArray(value)) settings = value
+    } catch {
+      return
+    }
+
+    const selectionTrigger = settings.selectionTrigger === 'auto' ? 'click' : 'auto'
+    try {
+      await api.storage.local.set({
+        [SETTINGS_KEY]: { ...settings, selectionTrigger },
+      })
+    } catch {
+      // Storage may be unavailable in private browsing; leave the state alone.
+    }
+  }
 
   async function injectContent(tabId) {
     try {

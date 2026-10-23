@@ -22,7 +22,6 @@ https://github.com/user-attachments/assets/a16d46de-6ed9-4f4e-83b3-02c055312408
 https://github.com/user-attachments/assets/bc63238f-fb14-42c2-8094-2c286b54416c
 ### Mobile Demo Videos
 https://github.com/user-attachments/assets/74ab2483-1e7d-4d19-a7dd-4e67cf75163e
-
 ## Tips
 
 - Answer quality depends on the prompts and the AI model.
@@ -30,6 +29,7 @@ https://github.com/user-attachments/assets/74ab2483-1e7d-4d19-a7dd-4e67cf75163e
 - You can enter any model name.
 - Temperature is customizable.
 - Press `ESC` to hide the panel.
+- `Alt + C` toggles between "Ask on Selection" and "Show Button on Selection".
 
 Mobile tips: [Android (Firefox for Android)](#android-firefox-for-android)
 
@@ -95,7 +95,9 @@ You can also configure it directly on the extension's Preferences page
   clicked". This button, the "Ask on selection" dropdown below it, and the round button at the
   bottom right on Android all control **the same setting and stay in sync**. The buttons switch
   only between these two modes. To disable selection questions entirely, so selecting text does
-  nothing, choose "Completely off" in the dropdown.
+  nothing, choose "Completely off" in the dropdown. `Alt+C` also toggles between instant questions
+  and the selection button by default; you can change the shortcut in Firefox's extension shortcuts
+  settings.
 - **Ask about selected text**: select text on any web page and a green button appears beside it.
   By default, its label shows the action for the selection, such as "Explain and translate".
   Click it to send the text to the model. In settings, you can switch to "Ask automatically

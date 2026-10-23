@@ -16,6 +16,8 @@ const actionClicks = []
 const toggles = []
 const openedOptions = []
 const createdTabs = []
+const commandHandlers = []
+const localStore = new Map()
 let platformOs = 'linux'
 
 globalThis.browser = {
@@ -30,6 +32,19 @@ globalThis.browser = {
     },
   },
   storage: {
+    local: {
+      get: async (key) => {
+        const value = localStore.get(key)
+        return value === undefined
+          ? {}
+          : { [key]: JSON.parse(JSON.stringify(value)) }
+      },
+      set: async (obj) => {
+        for (const [key, value] of Object.entries(obj)) {
+          localStore.set(key, JSON.parse(JSON.stringify(value)))
+        }
+      },
+    },
     session: {
       get: async (key) => (sessionStore.has(key) ? { [key]: sessionStore.get(key) } : {}),
       set: async (obj) => {
@@ -52,6 +67,7 @@ globalThis.browser = {
     onRemoved: { addListener: (fn) => onRemoved.push(fn) },
   },
   action: { onClicked: { addListener: (fn) => actionClicks.push(fn) } },
+  commands: { onCommand: { addListener: (fn) => commandHandlers.push(fn) } },
   scripting: { executeScript: async () => {} },
 }
 
@@ -87,6 +103,7 @@ const fromTab = (id, windowId = 1) => ({ tab: { id, windowId } })
   check('a connect listener was registered', onConnect.length > 0)
   check('a message listener was registered', onMessage.length > 0)
   check('tab removal is watched', onRemoved.length > 0)
+  check('a command listener was registered', commandHandlers.length > 0)
 
   console.log('per-tab panel state')
   const freshState = await dispatchRuntimeMessage({ t: 'apweb:panel-state' }, fromTab(42))
@@ -137,6 +154,44 @@ const fromTab = (id, windowId = 1) => ({ tab: { id, windowId } })
   await clickButton(9)
   check('without that API it opens the page in a tab', createdTabs.length === 1)
   check('pointing at the options page', /options\/options\.html$/.test(createdTabs[0]?.url ?? ''))
+
+  console.log('selection shortcut')
+  const runCommand = async (command) => {
+    for (const fn of commandHandlers) await fn(command)
+  }
+  const settingsKey = 'apweb.ai.settings'
+  localStore.set(settingsKey, {
+    providerId: 'custom',
+    baseUrl: 'https://relay.example/v1',
+    selectionTrigger: 'click',
+  })
+
+  await runCommand('toggle-selection-trigger')
+  check(
+    'the shortcut turns on instant questions',
+    localStore.get(settingsKey)?.selectionTrigger === 'auto',
+  )
+  check(
+    'it leaves the rest of the settings alone',
+    localStore.get(settingsKey)?.providerId === 'custom' &&
+      localStore.get(settingsKey)?.baseUrl === 'https://relay.example/v1',
+  )
+
+  await runCommand('toggle-selection-trigger')
+  check(
+    'pressing it again restores the selection button',
+    localStore.get(settingsKey)?.selectionTrigger === 'click',
+  )
+
+  localStore.set(settingsKey, { selectionTrigger: 'off' })
+  await runCommand('toggle-selection-trigger')
+  check(
+    'a fully disabled trigger switches back on',
+    localStore.get(settingsKey)?.selectionTrigger === 'auto',
+  )
+
+  await runCommand('another-command')
+  check('other commands are ignored', localStore.get(settingsKey)?.selectionTrigger === 'auto')
 
   console.log(failures ? `\n${failures} FAILURE(S)` : '\nall checks passed')
   process.exit(failures ? 1 : 0)

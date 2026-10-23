@@ -533,6 +533,14 @@ function eq(name, actual, expected) {
       '…and every locale has it',
       Boolean(actionKey) && locales.every((locale) => messages[locale][actionKey]?.message),
     )
+    const shortcut = manifest.commands?.['toggle-selection-trigger']
+    eq('the selection shortcut defaults to Alt+C', shortcut?.suggested_key?.default, 'Alt+C')
+    const shortcutKey = shortcut?.description?.match(/^__MSG_(\w+)__$/)?.[1]
+    check('the selection shortcut is localised', Boolean(shortcutKey))
+    check(
+      '…and every locale has its description',
+      Boolean(shortcutKey) && locales.every((locale) => messages[locale][shortcutKey]?.message),
+    )
 
     // The settings page is static HTML, so its text cannot come from AII18n like the
     // panel's does: it is filled from `_locales` in options.js instead.

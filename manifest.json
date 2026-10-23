@@ -21,6 +21,14 @@
   "background": {
     "scripts": ["src/shared/i18n.js", "src/shared/ai.js", "src/background.js"]
   },
+  "commands": {
+    "toggle-selection-trigger": {
+      "suggested_key": {
+        "default": "Alt+C"
+      },
+      "description": "__MSG_toggleSelectionShortcut__"
+    }
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

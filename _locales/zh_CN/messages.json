@@ -9,6 +9,9 @@
   "actionTitle": {
     "message": "AI 助手（划词问答）"
   },
+  "toggleSelectionShortcut": {
+    "message": "在划词即问和选中后显示按钮之间切换"
+  },
   "optionsPageTitle": {
     "message": "网页 AI 助手 · 设置"
   },
