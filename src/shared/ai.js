@@ -90,10 +90,13 @@
     // 'auto' (on) versus 'click' (off); 'off' is only reachable from the select.
     //   'click' | 'auto' | 'off'
     selectionTrigger: 'click',
-    // Android layout only, both edited on the settings page: how tall the in-page
-    // card may grow before its transcript scrolls, and whether the text you sent
-    // shows up in it (the answers always do).
+    // Android layout only, all edited on the settings page: how tall the in-page
+    // card may grow, how far its whole corner (card + buttons) sits from the
+    // bottom, whether the buttons sit on the left, and whether the text you sent
+    // shows up in the card (the answers always do).
     panelMaxHeight: 220,
+    panelBottom: 12,
+    mirrorLayout: false,
     showSentContent: true,
     // Which of `selectionPrompts` the button/auto-send uses, or 'off'.
     selectionAction: 'explain',
@@ -253,15 +256,27 @@
     openai: /^gpt-5/,
   }
 
-  // The Android card's height setting, in px. The stylesheet caps it at the
-  // viewport on top of this; the bounds are here so a typo cannot get in.
-  const CARD_HEIGHT_RANGE = { min: 160, max: 2000 }
+  // The Android card's height setting, in px. There is deliberately no practical
+  // minimum — the card may be made as short as wanted — only a 1px floor so it
+  // cannot become a zero/negative height, and a ceiling so a typo cannot get in.
+  const CARD_HEIGHT_RANGE = { min: 1, max: 2000 }
+
+  // How far the Android card and its buttons sit above the bottom edge. 0 keeps them
+  // as low as the gesture bar allows; larger values lift them clear of page chrome.
+  const PANEL_BOTTOM_RANGE = { min: 0, max: 500 }
 
   /** That setting, rounded into its range; a missing or silly value gets the default. */
   function clampCardHeight(value) {
     const number = Number(value)
     if (!Number.isFinite(number)) return DEFAULT_SETTINGS.panelMaxHeight
     return Math.min(Math.max(Math.round(number), CARD_HEIGHT_RANGE.min), CARD_HEIGHT_RANGE.max)
+  }
+
+  /** That setting, rounded into its range; a missing or silly value gets the default. */
+  function clampPanelBottom(value) {
+    const number = Number(value)
+    if (!Number.isFinite(number)) return DEFAULT_SETTINGS.panelBottom
+    return Math.min(Math.max(Math.round(number), PANEL_BOTTOM_RANGE.min), PANEL_BOTTOM_RANGE.max)
   }
 
   /** The fixed-temperature rule for this endpoint, or null if it takes a range. */
@@ -466,6 +481,7 @@
     temperatureIsFixed,
     effectiveTemperature,
     clampCardHeight,
+    clampPanelBottom,
     pairSlot,
     isTemperatureRejection,
     apiKeySlot,

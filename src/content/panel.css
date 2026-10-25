@@ -883,21 +883,35 @@
    prefixed with it — the desktop panel keeps its floating window. */
 
 .apweb-scope--mobile {
-  /* What the card has to leave clear on the right for the round controls. */
+  /* The round controls: 48px circles, 12px from the edge, 10px apart. */
   --ap-dock-size: 48px;
   --ap-dock-edge: 12px;
   --ap-dock-gap: 10px;
-  --ap-dock-right: 12px;
-  /* Everything along the bottom clears the Android gesture bar where the platform
-     reports one, and the plain 12px otherwise. */
+  /* The whole corner (card + buttons) sits this far above the bottom edge: the
+     Android gesture bar where the platform reports one, plus the offset from the
+     Android settings (`syncCardOptions` sets the same property from JS). */
   --ap-dock-bottom: calc(var(--ap-dock-edge) + env(safe-area-inset-bottom, 0px));
-  --ap-dock-column: calc(var(--ap-dock-size) + var(--ap-dock-right) + var(--ap-dock-gap));
+  /* How much room the buttons take on their side. */
+  --ap-dock-column: calc(var(--ap-dock-size) + var(--ap-dock-edge) + var(--ap-dock-gap));
+  /* Which side each takes; 界面镜像 swaps these four. */
+  --ap-card-left: var(--ap-dock-edge);
+  --ap-card-right: var(--ap-dock-column);
+  --ap-dock-left: auto;
+  --ap-dock-right: var(--ap-dock-edge);
+}
+
+/* 界面镜像: the round buttons move to the far left and the card takes the right. */
+.apweb-scope--mobile.apweb-scope--mirrored {
+  --ap-card-left: var(--ap-dock-column);
+  --ap-card-right: var(--ap-dock-edge);
+  --ap-dock-left: var(--ap-dock-edge);
+  --ap-dock-right: auto;
 }
 
 /* `inset` is top/right/bottom/left. The card is anchored rather than dragged, so
    the saved desktop geometry does not apply to it. */
 .apweb-scope--mobile .apweb-panel {
-  inset: auto var(--ap-dock-column) var(--ap-dock-bottom) var(--ap-dock-edge);
+  inset: auto var(--ap-card-right) var(--ap-dock-bottom) var(--ap-card-left);
   width: auto;
   height: auto;
   min-width: 0;
@@ -907,7 +921,7 @@
      picked in the Android settings, which may not win against a short screen. */
   max-height: min(
     var(--ap-card-max, 100vh),
-    calc(100vh - var(--ap-dock-bottom) - var(--ap-dock-edge))
+    max(0px, calc(100vh - var(--ap-dock-bottom) - var(--ap-dock-edge)))
   );
   border-radius: 16px;
 }
@@ -924,9 +938,10 @@
   display: none;
 }
 
-/* The corner controls: bottom-right, close button above the switch. */
+/* The corner controls: close, 提问, switch — on the right edge unless mirrored. */
 .apweb-dock {
   position: fixed;
+  left: var(--ap-dock-left);
   right: var(--ap-dock-right);
   bottom: var(--ap-dock-bottom);
   z-index: 2147483646;
@@ -981,4 +996,15 @@
   border-color: transparent;
   background: var(--ap-accent);
   color: #ffffff;
+}
+
+/* 提问: the dock's shortcut for the pill under a selection. It only shows in
+   「选中后显示按钮」, when the switch above it is pale — so the green circle reads as
+   the action, not as a second mode indicator. */
+.apweb-fab--ask {
+  border-color: transparent;
+  background: var(--ap-accent);
+  color: var(--ap-accent-ink);
+  font-size: 13.6px;
+  font-weight: 700;
 }

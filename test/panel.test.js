@@ -1222,7 +1222,11 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
     'the card is anchored to the bottom corner',
     /inset:\s*auto\b/.test(androidCardRule) && /max-height:/.test(androidCardRule),
   )
-  check('and stops short of the switch column', androidCardRule.includes('var(--ap-dock-column)'))
+  check(
+    'and leaves the switch column clear',
+    androidCardRule.includes('var(--ap-card-right)') &&
+      androidCardRule.includes('var(--ap-card-left)'),
+  )
   check('with the height setting as its ceiling', androidCardRule.includes('var(--ap-card-max'))
   const fabRule = panelRules.match(/\.apweb-fab\s*\{([^}]*)\}/)?.[1] ?? ''
   check('the corner controls are round', /border-radius:\s*999px/.test(fabRule))
@@ -1230,17 +1234,36 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   check('holding one cannot start a text selection', /user-select:\s*none/.test(fabRule))
   const fabOnRule = panelRules.match(/\.apweb-fab--on\s*\{([^}]*)\}/)?.[1] ?? ''
   check('the switch goes green while it is on', fabOnRule.includes('var(--ap-accent)'))
+  const fabAskRule = panelRules.match(/\.apweb-fab--ask\s*\{([^}]*)\}/)?.[1] ?? ''
+  check('the ask button is the green action', fabAskRule.includes('var(--ap-accent)'))
+  const mirrorRule =
+    panelRules.match(/\.apweb-scope--mobile\.apweb-scope--mirrored\s*\{([^}]*)\}/)?.[1] ?? ''
+  check(
+    'the mirrored layout swaps the two sides',
+    mirrorRule.includes('--ap-card-left: var(--ap-dock-column)') &&
+      mirrorRule.includes('--ap-dock-left: var(--ap-dock-edge)'),
+  )
   check(
     'answers-only hides what you sent',
     /\.apweb-panel--answers-only \.apweb-msg--user\s*\{[^}]*display:\s*none/.test(panelRules),
   )
 
   AIStore.updateSettings({ selectionTrigger: 'click' })
-  const android = AIPanel.createPanel({ startOpen: true, mobile: true })
+  let dockSelection = 'dockword'
+  const android = AIPanel.createPanel({
+    startOpen: true,
+    mobile: true,
+    getSelection: () => dockSelection,
+  })
   check('the scope is flagged as the mobile layout', android.el.classList.contains('apweb-scope--mobile'))
   const androidCard = android.el.querySelector('.apweb-panel')
   check('the card is only the conversation and the composer', !android.el.querySelector('.apweb-panel__head'))
   check('and its height setting reaches the stylesheet', android.el.style.getPropertyValue('--ap-card-max') === '220px')
+  check(
+    'and so does the bottom offset',
+    android.el.style.getPropertyValue('--ap-dock-bottom') ===
+      'calc(12px + env(safe-area-inset-bottom, 0px))',
+  )
   check(
     'nothing is placed by script: the stylesheet owns the geometry',
     androidCard.style.left === '' && androidCard.style.top === '' && androidCard.style.width === '',
@@ -1249,11 +1272,19 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
 
   const starBtn = android.el.querySelector('.apweb-fab--switch')
   const cornerClose = android.el.querySelector('.apweb-fab--close')
+  const dockAsk = android.el.querySelector('.apweb-fab--ask')
   const dock = android.el.querySelector('.apweb-dock')
-  check('the corner switch is there', !!starBtn && !!cornerClose)
-  check('with the close button above the switch', dock?.childNodes[0] === cornerClose && dock?.childNodes[1] === starBtn)
+  check('the corner switch is there', !!starBtn && !!cornerClose && !!dockAsk)
+  check(
+    'with close, ask and switch in that order',
+    dock?.childNodes[0] === cornerClose &&
+      dock?.childNodes[1] === dockAsk &&
+      dock?.childNodes[2] === starBtn,
+  )
   check('the switch carries the star svg', !!starBtn?.querySelector('svg'))
   check('and the close button the cross svg', !!cornerClose?.querySelector('svg'))
+  check('the ask button says 提问', dockAsk?.textContent === '提问')
+  check('and is there while selections wait for the pill', dockAsk?.hidden === false)
   check(
     'the switch is pale while a selection waits for the button',
     starBtn?.classList.contains('apweb-fab--on') === false &&
@@ -1281,6 +1312,28 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   starBtn.dispatch('click', {})
   check('tapping from fully off switches the sending on', AIStore.state.settings.selectionTrigger === 'auto')
   AIStore.updateSettings({ selectionTrigger: 'click' })
+
+  // 提问 is only in the "show a pill" mode, and does the same thing the pill does.
+  dockAsk.dispatch('click', {})
+  await tick()
+  await tick()
+  check(
+    'the ask button asks about the current selection',
+    AIStore.state.messages.some((message) => message.content === 'dockword'),
+  )
+  AIStore.updateSettings({ selectionTrigger: 'auto' })
+  check('it disappears when selections send themselves', dockAsk.hidden === true)
+  AIStore.updateSettings({ selectionTrigger: 'off' })
+  check('and when 划词提问 is fully off', dockAsk.hidden === true)
+  AIStore.updateSettings({ selectionTrigger: 'click' })
+  check('and comes back with the pill mode', dockAsk.hidden === false)
+
+  // Nothing selected: opening the card is more useful than doing nothing.
+  dockSelection = ''
+  android.setOpen(false)
+  dockAsk.dispatch('click', {})
+  check('with nothing selected it opens the card', android.isOpen() === true)
+  dockSelection = 'dockword'
 
   cornerClose.dispatch('click', {})
   check('the corner close button hides the card', android.isOpen() === false && androidCard.hidden === true)
@@ -1337,6 +1390,14 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
     .querySelectorAll('input')
     .find((input) => input.getAttribute('data-field') === 'show-sent-content')
   check('and the “show what I sent” switch', !!sentSwitch && sentSwitch.checked === true)
+  const bottomInput = optionsSettings
+    .querySelectorAll('input')
+    .find((input) => input.getAttribute('data-field') === 'panel-bottom')
+  check('with the bottom offset', !!bottomInput && bottomInput.value === '12')
+  const mirrorSwitch = optionsSettings
+    .querySelectorAll('input')
+    .find((input) => input.getAttribute('data-field') === 'mirror-layout')
+  check('and the mirror switch', !!mirrorSwitch && mirrorSwitch.checked === false)
 
   heightInput.value = '900'
   heightInput.dispatch('input', { target: heightInput })
@@ -1344,7 +1405,27 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   check('and reaches the card without a reload', android.el.style.getPropertyValue('--ap-card-max') === '900px')
   heightInput.value = '9'
   heightInput.dispatch('input', { target: heightInput })
-  check('a silly height is clamped, not stored', AIStore.state.settings.panelMaxHeight === 160)
+  check('there is no minimum height any more', AIStore.state.settings.panelMaxHeight === 9)
+  heightInput.value = '99999'
+  heightInput.dispatch('input', { target: heightInput })
+  check('an absurd height is still clamped', AIStore.state.settings.panelMaxHeight === 2000)
+
+  bottomInput.value = '100'
+  bottomInput.dispatch('input', { target: bottomInput })
+  check('the bottom offset is saved', AIStore.state.settings.panelBottom === 100)
+  check(
+    'and lifts the card with the buttons',
+    android.el.style.getPropertyValue('--ap-dock-bottom') ===
+      'calc(100px + env(safe-area-inset-bottom, 0px))',
+  )
+
+  mirrorSwitch.checked = true
+  mirrorSwitch.dispatch('change', { target: mirrorSwitch })
+  check('mirroring is saved', AIStore.state.settings.mirrorLayout === true)
+  check('and swaps the sides on the card', android.el.classList.contains('apweb-scope--mirrored'))
+  mirrorSwitch.checked = false
+  mirrorSwitch.dispatch('change', { target: mirrorSwitch })
+  check('turning it off restores the corner', !android.el.classList.contains('apweb-scope--mirrored'))
 
   sentSwitch.checked = false
   sentSwitch.dispatch('change', { target: sentSwitch })

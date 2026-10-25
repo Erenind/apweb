@@ -120,6 +120,10 @@
       androidSettings: '安卓设置',
       cardMaxHeight: '内容框最高高度（px）',
       cardMaxHeightNote: '内容框从屏幕底部往上长到这个高度就停住，再长就在框内滚动。',
+      cardBottom: '距底部距离（px）',
+      cardBottomNote: '内容框和圆钮会一起上移这么多，用来避开页面底部的内容。默认 12。',
+      mirrorLayout: '界面镜像（按钮放到最左端）',
+      mirrorLayoutNote: '打开后圆形按钮在最左端、内容框在右侧；关掉则按钮回到右下角。',
       showSentContent: '在内容框里显示我发送的内容',
       showSentContentNote:
         '关掉后内容框只留下 AI 的回答，划词时问的那句话不再显示（设置页里仍然能看到完整对话）。',
@@ -152,6 +156,8 @@
       switchAuto: '选中即发送：点按改回「先弹出按钮」，长按打开对话框',
       switchClick: '选中后弹出「问 AI」按钮：点按改为「选中即发送」，长按打开对话框',
       switchFullyOff: '划词提问已完全关闭：点按改为「选中即发送」，长按打开对话框',
+      askDock: '提问',
+      askDockTitle: '用当前选中的文字提问',
       closePanel: '关闭面板',
       // Shipped prompts --------------------------------------------------------
       composerPromptName: '默认助手',
@@ -257,6 +263,12 @@
       cardMaxHeight: 'Card height limit (px)',
       cardMaxHeightNote:
         'The card grows upward from the bottom of the screen and stops at this height; longer answers scroll inside it.',
+      cardBottom: 'Bottom offset (px)',
+      cardBottomNote:
+        'Moves the card and its buttons up together, clear of content at the bottom of the page. Default 12.',
+      mirrorLayout: 'Mirror the layout (buttons on the left)',
+      mirrorLayoutNote:
+        'On puts the round buttons on the far left and the card to their right; off puts the buttons back in the bottom-right corner.',
       showSentContent: 'Show what I sent in the card',
       showSentContentNote:
         'Off leaves only the answers in the card — the text you selected and asked about is still in the conversation on the settings page.',
@@ -286,6 +298,8 @@
       switchAuto: 'Send on select: tap for the button instead, long-press to open the card',
       switchClick: 'A selection shows the “Ask AI” button: tap to send straight away, long-press to open the card',
       switchFullyOff: 'Ask on select is fully off: tap to send straight away, long-press to open the card',
+      askDock: 'Ask',
+      askDockTitle: 'Ask about the selected text',
       closePanel: 'Close the panel',
       composerPromptName: 'Default assistant',
       composerPromptText:

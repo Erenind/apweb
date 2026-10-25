@@ -25,7 +25,8 @@
   // history from a mode you have since switched away from out of the request.
   const MESSAGE_FIELDS = ['role', 'content', 'forModel', 'context', 'reasoning', 'action']
 
-  const { DEFAULT_SETTINGS, apiKeySlot, clampCardHeight, findPrompt, providerById } = AICore
+  const { DEFAULT_SETTINGS, apiKeySlot, clampCardHeight, clampPanelBottom, findPrompt, providerById } =
+    AICore
 
   async function read(key, fallback) {
     try {
@@ -141,6 +142,8 @@
     // Android layout: how tall the card may grow, and whether it shows what you
     // sent as well as the answers.
     const panelMaxHeight = clampCardHeight(merged.panelMaxHeight ?? DEFAULT_SETTINGS.panelMaxHeight)
+    const panelBottom = clampPanelBottom(merged.panelBottom ?? DEFAULT_SETTINGS.panelBottom)
+    const mirrorLayout = merged.mirrorLayout === true
     const showSentContent = merged.showSentContent !== false
 
     const contextMode = merged.contextMode === 'page' ? 'page' : 'paragraph'
@@ -187,6 +190,8 @@
       panelRect,
       selectionTrigger,
       panelMaxHeight,
+      panelBottom,
+      mirrorLayout,
       showSentContent,
       composerPrompts,
       composerPromptId:

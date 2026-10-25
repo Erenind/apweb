@@ -289,13 +289,17 @@ only a content card and a row of round buttons, while **settings have their own 
   and sending happens only when you tap it. The latter is the default. Tap to switch modes;
   **press and hold to open the content card**. The collapsed card has no title bar, so open it
   by holding the button, or let it open automatically when the AI responds.
+- **The green "Ask" button above it** appears only in the show-a-button mode (the other two modes
+  hide it). Tapping it does the same thing as the "Ask AI" pill under a selection: it asks about
+  the text selected right now. With nothing selected it opens the card instead.
 - **The content card does not open the keyboard automatically**: opening it from a selection
   does not focus the input box, because the keyboard would cover the answer. Tap the input when
   you want to type. On desktop, opening the panel still focuses the input.
 - **The content card at the bottom left** contains only the conversation and input area,
-  with **no title bar**, so there is no dragging to move or resize it. The round ✕ button outside
-  its upper-right corner hides it. The card grows upward from the bottom of the screen until it
-  reaches "Maximum card height", then scrolls internally.
+  with **no title bar**, so there is no dragging to move or resize it. The round ✕ at the top of
+  the button column hides it. The card grows upward from the bottom of the screen until it reaches
+  "Maximum card height", then scrolls internally. There is **no minimum height**, and the card
+  and the whole button column move up and down together.
 - **The input area can collapse**: tap the small arrow at its top left to collapse or expand
   the input row. This state shares the same setting as desktop.
 - **"Ask AI" appears after selecting text**: long-press text selection on mobile does not trigger
@@ -308,16 +312,18 @@ The "Android settings" section appears only on Android and is hidden on desktop:
 
 | Setting | Purpose | Default |
 | --- | --- | --- |
-| **Maximum card height (px)** | The card grows upward from the bottom of the screen to this height, then scrolls internally. Range: 160–2000; if the screen is shorter, the screen height takes precedence. | 220 |
+| **Maximum card height (px)** | The card grows upward from the bottom of the screen to this height, then scrolls internally. There is **no minimum**, range 1–2000; if the screen is shorter, the screen height takes precedence. | 220 |
+| **Bottom offset (px)** | Moves the card and the whole button column up together, clear of content hidden at the bottom of the page. Range 0–500. | 12 |
+| **Mirror the layout (buttons on the left)** | On moves the buttons to the far left and the card to the right; off keeps the buttons in the bottom-right corner. | Off |
 | **Show my sent content in the card** | Turn this off to show only AI answers in the card and hide the messages sent when asking about selections. The settings page still shows the full conversation. | On |
 
-Both are stored in `browser.storage.local` as `panelMaxHeight` / `showSentContent`.
-Changes take effect immediately without reloading the page.
+They are stored in `browser.storage.local` as `panelMaxHeight` / `panelBottom` /
+`mirrorLayout` / `showSentContent`. Changes take effect immediately without reloading the page.
 
 ## Settings Page and Content Card
 
 - **Settings page**: API key, provider, model, temperature, thinking mode, both prompt sets,
-  selection questions and actions, and the two Android settings above. It uses the same settings
+  selection questions and actions, and the Android settings above. It uses the same settings
   and page implementation as the desktop panel's ⚙ view.
 - **Content card**: only for reading answers and asking questions. It stays at the bottom of the
   screen, cannot be dragged or resized, and never writes `panelRect`.

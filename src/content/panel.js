@@ -382,9 +382,9 @@
 
     scope.appendChild(refs.panel)
 
-    // The Android corner controls: a round switch that turns 划词即问 on and off,
-    // and — while the card is open — a round close button above it. Since the card
-    // has no title bar, holding the switch is what brings it back.
+    // The Android corner controls, top to bottom: close (while the card is open),
+    // 提问 (while a selection waits for the pill), and the 划词即问 switch. Since the
+    // card has no title bar, holding the switch is what brings it back.
     if (mobile) {
       let pressTimer = null
       let longPressed = false
@@ -432,8 +432,24 @@
         title: i18n.t('closePanel'),
         on: { click: () => setOpen(false) },
       }, [svgIcon(CROSS_PATH, true)])
-      // The column order is what puts the close button above the switch.
-      refs.dock = h('div', { class: 'apweb-dock' }, [refs.closeFab, refs.switchBtn])
+      // 提问: the same ask the pill next to a selection makes, for when the pill has
+      // already gone. It only makes sense in 「选中后显示按钮」, so it is hidden in the
+      // other two trigger states.
+      refs.askBtn = h('button', {
+        type: 'button',
+        class: 'apweb-fab apweb-fab--ask',
+        'data-field': 'ask-selection',
+        title: i18n.t('askDockTitle'),
+        on: { click: () => askFromDock() },
+      }, [i18n.t('askDock')])
+      // Keep the page selection alive on the way down, exactly like the pill: without
+      // this the browser can collapse it before the click reads it.
+      refs.askBtn.addEventListener('mousedown', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+      })
+      // The column order is close, then 提问, then the switch.
+      refs.dock = h('div', { class: 'apweb-dock' }, [refs.closeFab, refs.askBtn, refs.switchBtn])
       scope.appendChild(refs.dock)
     }
 
@@ -503,6 +519,8 @@
         refs.temperatureInput = null
         refs.temperatureNote = null
         refs.cardHeightInput = null
+        refs.cardBottomInput = null
+        refs.mirrorRow = null
         refs.sentRow = null
       }
       syncComposer()
@@ -640,15 +658,41 @@
     const toggleSelectionAuto = () => setSelectionAuto(!isSelectionAuto())
 
     /**
-     * Android: the two things the card's own settings change. Both are handed to
-     * the stylesheet — the height as a custom property (so the viewport cap next to
-     * it stays CSS's business) and "answers only" as a class, which reflows the
-     * transcript instead of rebuilding it.
+     * The dock's 提问 button: the same ask the pill under a selection makes, for the
+     * case where the pill is no longer on screen. With nothing selected it opens the
+     * card instead of doing nothing at all.
+     */
+    function askFromDock() {
+      const text = getSelection().trim()
+      if (!text) {
+        setOpen(true)
+        return
+      }
+      const built = buildSelectionContext(text)
+      void askSelection({
+        text,
+        action: S().selectionAction,
+        context: built.context,
+        contextInfo: built.contextInfo,
+      })
+    }
+
+    /**
+     * Android: everything the card's own settings change. The numbers are handed to
+     * the stylesheet as custom properties (so the viewport cap next to them stays
+     * CSS's business); mirroring and "answers only" are classes, which reflow the
+     * transcript and corner instead of rebuilding them.
      */
     function syncCardOptions() {
       if (!mobile) return
-      scope.style.setProperty('--ap-card-max', `${S().panelMaxHeight}px`)
-      refs.panel.classList.toggle('apweb-panel--answers-only', S().showSentContent === false)
+      const settings = S()
+      scope.style.setProperty('--ap-card-max', `${settings.panelMaxHeight}px`)
+      scope.style.setProperty(
+        '--ap-dock-bottom',
+        `calc(${settings.panelBottom}px + env(safe-area-inset-bottom, 0px))`,
+      )
+      scope.classList.toggle('apweb-scope--mirrored', settings.mirrorLayout === true)
+      refs.panel.classList.toggle('apweb-panel--answers-only', settings.showSentContent === false)
     }
 
     /** Keep the corner controls in step with the setting, whoever changed it. */
@@ -665,6 +709,8 @@
       refs.switchBtn.title = label
       refs.switchBtn.setAttribute('aria-label', label)
       refs.closeFab.hidden = !open
+      // 提问 only exists while a selection is supposed to show the pill.
+      refs.askBtn.hidden = S().selectionTrigger !== 'click'
     }
 
     /**
@@ -1458,9 +1504,9 @@
         )
         refs.cardHeightInput = h('input', {
           type: 'number',
-          min: '160',
+          min: '1',
           max: '2000',
-          step: '20',
+          step: '1',
           value: String(settings.panelMaxHeight),
           'data-field': 'panel-max-height',
           on: {
@@ -1480,6 +1526,43 @@
             refs.cardHeightInput,
             h('span', { class: 'apweb-hint-inline', text: i18n.t('cardMaxHeightNote') }),
           ),
+        )
+        refs.cardBottomInput = h('input', {
+          type: 'number',
+          min: '0',
+          max: '500',
+          step: '1',
+          value: String(settings.panelBottom),
+          'data-field': 'panel-bottom',
+          on: {
+            input: (event) => {
+              const value = Number(event.target.value)
+              if (event.target.value.trim() !== '' && Number.isFinite(value)) {
+                update({ panelBottom: AICore.clampPanelBottom(value) })
+              }
+            },
+          },
+        })
+        refs.settingsEl.appendChild(
+          field(
+            i18n.t('cardBottom'),
+            refs.cardBottomInput,
+            h('span', { class: 'apweb-hint-inline', text: i18n.t('cardBottomNote') }),
+          ),
+        )
+        refs.mirrorRow = h('label', { class: 'apweb-check' }, [
+          h('input', {
+            class: 'apweb-switch',
+            type: 'checkbox',
+            checked: settings.mirrorLayout === true,
+            'data-field': 'mirror-layout',
+            on: { change: (event) => update({ mirrorLayout: event.target.checked }) },
+          }),
+          h('span', { text: i18n.t('mirrorLayout') }),
+        ])
+        refs.settingsEl.appendChild(refs.mirrorRow)
+        refs.settingsEl.appendChild(
+          h('p', { class: 'apweb-note', text: i18n.t('mirrorLayoutNote') }),
         )
         refs.sentRow = h('label', { class: 'apweb-check' }, [
           h('input', {
