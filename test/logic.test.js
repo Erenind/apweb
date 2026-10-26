@@ -359,6 +359,7 @@ function eq(name, actual, expected) {
   eq('card height default', AIStore.state.settings.panelMaxHeight, 220)
   eq('bottom offset default', AIStore.state.settings.panelBottom, 12)
   check('the layout is not mirrored by default', AIStore.state.settings.mirrorLayout === false)
+  check('the selection pill shows by default', AIStore.state.settings.hideSelectionPill === false)
   check('what you sent shows in the card by default', AIStore.state.settings.showSentContent === true)
   eq('an absurd height is clamped', AICore.clampCardHeight(99999), 2000)
   eq('there is no practical minimum height', AICore.clampCardHeight(1), 1)
@@ -369,12 +370,14 @@ function eq(name, actual, expected) {
     panelMaxHeight: 'not a number',
     panelBottom: 'nope',
     mirrorLayout: 'yes',
+    hideSelectionPill: 'yes',
     showSentContent: false,
   }
   await AIStore.load()
   eq('a stored typo does not survive a load', AIStore.state.settings.panelMaxHeight, 220)
   eq('the bottom falls back too', AIStore.state.settings.panelBottom, 12)
   check('only a real boolean mirrors the layout', AIStore.state.settings.mirrorLayout === false)
+  check('and only a real boolean hides the pill', AIStore.state.settings.hideSelectionPill === false)
   check('and the switch is remembered', AIStore.state.settings.showSentContent === false)
   storage['apweb.ai.settings'] = {}
   await AIStore.load()

@@ -305,6 +305,7 @@ only a content card and a row of round buttons, while **settings have their own 
 - **"Ask AI" appears after selecting text**: long-press text selection on mobile does not trigger
   `mouseup`, so selection detection follows `selectionchange` / `touchend`. After selecting,
   wait briefly for the small green button to appear beside the selection, then tap it to ask.
+  You can hide it in the Android settings and use the dock's "Ask" button instead.
 
 ## Android-Specific Settings
 
@@ -315,10 +316,12 @@ The "Android settings" section appears only on Android and is hidden on desktop:
 | **Maximum card height (px)** | The card grows upward from the bottom of the screen to this height, then scrolls internally. There is **no minimum**, range 1–2000; if the screen is shorter, the screen height takes precedence. | 220 |
 | **Bottom offset (px)** | Moves the card and the whole button column up together, clear of content hidden at the bottom of the page. Range 0–500. | 12 |
 | **Mirror the layout (buttons on the left)** | On moves the buttons to the far left and the card to the right; off keeps the buttons in the bottom-right corner. | Off |
+| **Hide the button under a selection** | On removes the small “Explain only”-style action button after selecting text; the dock's “Ask” button still asks about the selection. | Off |
 | **Show my sent content in the card** | Turn this off to show only AI answers in the card and hide the messages sent when asking about selections. The settings page still shows the full conversation. | On |
 
 They are stored in `browser.storage.local` as `panelMaxHeight` / `panelBottom` /
-`mirrorLayout` / `showSentContent`. Changes take effect immediately without reloading the page.
+`mirrorLayout` / `hideSelectionPill` / `showSentContent`. Changes take effect immediately without
+reloading the page.
 
 ## Settings Page and Content Card
 

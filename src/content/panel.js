@@ -521,6 +521,7 @@
         refs.cardHeightInput = null
         refs.cardBottomInput = null
         refs.mirrorRow = null
+        refs.hidePillRow = null
         refs.sentRow = null
       }
       syncComposer()
@@ -1563,6 +1564,20 @@
         refs.settingsEl.appendChild(refs.mirrorRow)
         refs.settingsEl.appendChild(
           h('p', { class: 'apweb-note', text: i18n.t('mirrorLayoutNote') }),
+        )
+        refs.hidePillRow = h('label', { class: 'apweb-check' }, [
+          h('input', {
+            class: 'apweb-switch',
+            type: 'checkbox',
+            checked: settings.hideSelectionPill === true,
+            'data-field': 'hide-selection-pill',
+            on: { change: (event) => update({ hideSelectionPill: event.target.checked }) },
+          }),
+          h('span', { text: i18n.t('hideSelectionPill') }),
+        ])
+        refs.settingsEl.appendChild(refs.hidePillRow)
+        refs.settingsEl.appendChild(
+          h('p', { class: 'apweb-note', text: i18n.t('hideSelectionPillNote') }),
         )
         refs.sentRow = h('label', { class: 'apweb-check' }, [
           h('input', {

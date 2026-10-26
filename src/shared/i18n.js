@@ -124,6 +124,9 @@
       cardBottomNote: '内容框和圆钮会一起上移这么多，用来避开页面底部的内容。默认 12。',
       mirrorLayout: '界面镜像（按钮放到最左端）',
       mirrorLayoutNote: '打开后圆形按钮在最左端、内容框在右侧；关掉则按钮回到右下角。',
+      hideSelectionPill: '隐藏选中文字下方的提示按钮（「只解释」等）',
+      hideSelectionPillNote:
+        '打开后选中文字不再弹出「只解释」这类小按钮，改用圆钮那一列的「提问」按钮提问。',
       showSentContent: '在内容框里显示我发送的内容',
       showSentContentNote:
         '关掉后内容框只留下 AI 的回答，划词时问的那句话不再显示（设置页里仍然能看到完整对话）。',
@@ -269,6 +272,9 @@
       mirrorLayout: 'Mirror the layout (buttons on the left)',
       mirrorLayoutNote:
         'On puts the round buttons on the far left and the card to their right; off puts the buttons back in the bottom-right corner.',
+      hideSelectionPill: 'Hide the button under a selection (“Explain only” and the like)',
+      hideSelectionPillNote:
+        'When on, selecting text no longer pops that small action button — use the “Ask” button in the round dock instead.',
       showSentContent: 'Show what I sent in the card',
       showSentContentNote:
         'Off leaves only the answers in the card — the text you selected and asked about is still in the conversation on the settings page.',

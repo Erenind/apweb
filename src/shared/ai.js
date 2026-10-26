@@ -98,6 +98,9 @@
     panelBottom: 12,
     mirrorLayout: false,
     showSentContent: true,
+    // Android: whether a selection pops the small 「问 AI」 pill under it at all. The
+    // dock's 提问 button stays available, so this only removes the extra bubble.
+    hideSelectionPill: false,
     // Which of `selectionPrompts` the button/auto-send uses, or 'off'.
     selectionAction: 'explain',
     // Two prompt libraries, one per entry point. Edit them, add your own,

@@ -1200,6 +1200,19 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
     ),
   )
 
+  // The Android setting can switch the pill off; the dock's 提问 button remains the
+  // way to ask about a selection then.
+  AIStore.updateSettings({ hideSelectionPill: true })
+  shadowPill.hidden = true
+  document.dispatch('selectionchange', { target: document })
+  await new Promise((r) => setTimeout(r, 420))
+  check('the pill can be switched off', shadowPill.hidden === true)
+  AIStore.updateSettings({ hideSelectionPill: false })
+  shadowPill.hidden = true
+  document.dispatch('selectionchange', { target: document })
+  await new Promise((r) => setTimeout(r, 420))
+  check('and comes back when switched on again', shadowPill.hidden === false)
+
   // `navigator` is a getter on the node global, so it has to be redefined rather
   // than assigned (the harness's own `globalThis.navigator = {}` is a no-op).
   const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
@@ -1398,6 +1411,10 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
     .querySelectorAll('input')
     .find((input) => input.getAttribute('data-field') === 'mirror-layout')
   check('and the mirror switch', !!mirrorSwitch && mirrorSwitch.checked === false)
+  const pillSwitch = optionsSettings
+    .querySelectorAll('input')
+    .find((input) => input.getAttribute('data-field') === 'hide-selection-pill')
+  check('and the hide-the-pill switch', !!pillSwitch && pillSwitch.checked === false)
 
   heightInput.value = '900'
   heightInput.dispatch('input', { target: heightInput })
@@ -1426,6 +1443,13 @@ const tick = () => new Promise((r) => setTimeout(r, 10))
   mirrorSwitch.checked = false
   mirrorSwitch.dispatch('change', { target: mirrorSwitch })
   check('turning it off restores the corner', !android.el.classList.contains('apweb-scope--mirrored'))
+
+  pillSwitch.checked = true
+  pillSwitch.dispatch('change', { target: pillSwitch })
+  check('hiding the pill is saved', AIStore.state.settings.hideSelectionPill === true)
+  pillSwitch.checked = false
+  pillSwitch.dispatch('change', { target: pillSwitch })
+  check('and turning it off restores the pill', AIStore.state.settings.hideSelectionPill === false)
 
   sentSwitch.checked = false
   sentSwitch.dispatch('change', { target: sentSwitch })

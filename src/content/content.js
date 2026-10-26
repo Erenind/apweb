@@ -256,6 +256,14 @@
       return
     }
 
+    // Android can switch the pill off entirely — the dock's 提问 button is the way
+    // to ask then. The setting is only offered on that platform, and a profile's
+    // storage is per device, so no desktop user can end up with it on.
+    if (AIStore.state.settings.hideSelectionPill) {
+      hidePill()
+      return
+    }
+
     showPill(range.getBoundingClientRect(), text, action)
   }
 
@@ -411,6 +419,14 @@
 
     buildPill()
     installSelectionListeners()
+
+    // The pill is a snapshot of the selection at the time it appeared: once its
+    // reason to exist goes away (switched to auto/off, or the pill disabled in the
+    // Android settings) it should not linger on the page.
+    AIStore.subscribe(() => {
+      const settings = AIStore.state.settings
+      if (settings.hideSelectionPill || settings.selectionTrigger !== 'click') hidePill()
+    })
 
     api.runtime.onMessage.addListener((message) => {
       if (message?.t === 'apweb:toggle-panel') {

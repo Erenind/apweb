@@ -145,6 +145,7 @@
     const panelBottom = clampPanelBottom(merged.panelBottom ?? DEFAULT_SETTINGS.panelBottom)
     const mirrorLayout = merged.mirrorLayout === true
     const showSentContent = merged.showSentContent !== false
+    const hideSelectionPill = merged.hideSelectionPill === true
 
     const contextMode = merged.contextMode === 'page' ? 'page' : 'paragraph'
 
@@ -193,6 +194,7 @@
       panelBottom,
       mirrorLayout,
       showSentContent,
+      hideSelectionPill,
       composerPrompts,
       composerPromptId:
         findPrompt(composerPrompts, merged.composerPromptId ?? merged.systemPromptId)?.id ??
