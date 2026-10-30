@@ -33,13 +33,16 @@ https://github.com/user-attachments/assets/74ab2483-1e7d-4d19-a7dd-4e67cf75163e
 
 Mobile tips: [Android (Firefox for Android)](#android-firefox-for-android)
 
+Recommend Model
+- qwen3.8-flash -- fast and almost free
+
 ## Installation
 
 ### Firefox
 
 #### Add-ons Store
 
-<a href="https://addons.mozilla.org/zh-CN/firefox/addon/%E7%BD%91%E9%A1%B5-ai-%E5%8A%A9%E6%89%8B-%E5%88%92%E8%AF%8D%E9%97%AE%E7%AD%94/">Open the Firefox add-on page</a>
+<a href="https://addons.mozilla.org/en-US/firefox/addon/apweb/">Open the Firefox add-on page</a>
 
 #### Temporary Installation
 
@@ -52,17 +55,27 @@ Mobile tips: [Android (Firefox for Android)](#android-firefox-for-android)
 > For long-term use, you can package it as a `.zip` and have the developer version signed,
 > or continue loading it temporarily from this page.
 
-### Edge
+### edge and chrome
+waiting for online.
 
-🕳
+**temporarily loading**:
+The adapter plugin is located in the `chrome_edge` branch.
 
-### Chrome
-
-🕳
+1. clone the source code
+```sh
+git clone -b chrome_edge https://github.com/erenind/apweb
+```
+2. Open the extension management page.
+	- Chrome browser: Enter chrome://extensions/ in the address bar and press Enter.
+	- Edge browser: Enter edge://extensions/ in the address bar and press Enter.
+3. Enable Developer mode.
+	- In the upper right corner of the page (Chrome) or the lower left/upper right corner (Edge), find and turn on the "Developer mode" switch.
+4. Load the extension.
+	- Click the newly appeared "Load unpacked" button on the page.
+	- In the file selection dialog that pops up, select the root folder of the plugin you have extracted (that is, the directory level that directly contains manifest.json; do not select a subfolder inside it) and click Select.
 
 ### Safari
-
-🕳
+after I have a mac.
 
 ## Getting Started
 
